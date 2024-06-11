@@ -102,3 +102,180 @@ fh_reportcoef_table <- function(model,
 
 
 }
+
+### modify the benchmark function for FH to support group benchmarking
+
+
+benchmark2 <- function(object, benchmark, share, type = "raking",
+                       overwrite = FALSE, group) {
+  check_benchmark_arguments2(
+    object = object,
+    benchmark = benchmark,
+    share = share,
+    type = type,
+    overwrite = overwrite
+  )
+
+  estim <- object$ind$FH
+  FH_bench <- rep(NA, length(object$ind$FH))
+  mse <- object$MSE$FH
+
+  bench_dt <- data.frame(benchmark = benchmark,
+                         share = share,
+                         estim = estim,
+                         group = group,
+                         mse = mse)
+
+
+  benchwork <- function(estim,
+                        benchmark,
+                        share,
+                        mse){
+
+    if (type == "raking") {
+      FH_bench <- estim + benchmark - sum(share * estim)
+    } else if (type == "ratio") {
+      phi <- share / estim
+      FH_bench <- estim + (1 / (sum(share^2 / phi))) *
+        (benchmark - sum(share * estim)) * (share / phi)
+    } else if (type == "MSE_adj") {
+      phi <- share / mse
+      FH_bench <- estim + (1 / (sum(share^2 / phi))) *
+        (benchmark - sum(share * estim)) * (share / phi)
+    }
+
+    return(FH_bench)
+
+  }
+
+  result <- list()
+
+  for (i in seq_along(unique(group))){
+
+    result[[i]] <- benchwork(estim = bench_dt$estim[bench_dt$group == unique(group)[i]],
+                             benchmark = bench_dt$benchmark[bench_dt$group == unique(group)[i]],
+                             share = bench_dt$share[bench_dt$group == unique(group)[i]],
+                             mse = bench_dt$mse[bench_dt$group == unique(group)[i]])
+
+  }
+
+  FH_bench <- unlist(result)
+
+  if (overwrite == FALSE) {
+    eblup_data_bench <- data.frame(Domain = object$ind$Domain)
+    eblup_data_bench$Direct <- object$ind$Direct
+    eblup_data_bench$FH <- object$ind$FH
+    eblup_data_bench$FH_Bench <- FH_bench
+    eblup_data_bench$Out <- object$ind$Out
+    result <- eblup_data_bench
+  } else {
+    object$ind$FH_Bench <- FH_bench
+    object$ind <- object$ind[, c("Domain", "Direct", "FH", "FH_Bench", "Out")]
+    object["MSE"] <- list(NULL)
+
+    message(strwrap(prefix = " ", initial = "",
+                    "Please note that only point estimates are benchmarked.
+                    Thus, the MSE element in the new emdi object is NULL."))
+    result <- object
+  }
+
+  return(result)
+
+}
+
+
+
+
+
+
+
+
+
+
+
+######################################################################
+# Argument checking
+check_benchmark_arguments2 <- function(object, benchmark, share, type,
+                                      overwrite) {
+  if (!inherits(object, "fh")) {
+    stop("Object needs to be fh object.")
+  }
+
+  povmap:::throw_class_error(object, "fh")
+
+  if ((any(is.na(object$ind$FH)))) {
+    stop(strwrap(prefix = " ", initial = "",
+                 "If no predictions for out-of-sample domains are available,
+                the benchmarking algorithm does not work."))
+  }
+  if (is.null(type) || !(is.character(type)) || !(type == "raking" ||
+                                                  type == "ratio" ||
+                                                  type == "MSE_adj")) {
+    stop(strwrap(prefix = " ", initial = "",
+                 "Type must be a character. The three options for types are
+                 ''raking'', ''ratio'' and ''MSE_adj''."))
+  }
+  if ((is.null(object$MSE)) && type == "MSE_adj") {
+    stop(strwrap(prefix = " ", initial = "",
+                 "If no MSE estimates are available, ''MSE_adj'' benchmarking
+                 does not work. The fh object has to contain MSE estimates.
+                 Therefore set the MSE argument of the fh function to TRUE."))
+  }
+  if ((any(is.na(object$MSE$FH))) && type == "MSE_adj") {
+    stop(strwrap(prefix = " ", initial = "",
+                 "For the benchmarking type ''MSE_adj'' the MSE estimates of
+                 the fh object must not contain NAs. If no MSE estimates for
+                 out-of-sample domains are available,''MSE_adj'' benchmarking
+                 does not work."))
+  }
+  # if (is.null(benchmark) || !(is.numeric(benchmark) &&
+  #                             length(benchmark) == 1)) {
+  #   stop(strwrap(prefix = " ", initial = "",
+  #                "benchmark needs to be a single numeric value. See also
+  #                help(benchmark)."))
+  # }
+  if (!is.vector(share) || length(share) != length(object$ind$Domain)) {
+    stop(strwrap(prefix = " ", initial = "",
+                 "share must be a vector with length equal to the number of
+                 domains. See also help(benchmark)."))
+  }
+  if (any(is.na(share))) {
+    stop("share must not contain NAs.")
+  }
+  if (!is.logical(overwrite) || length(overwrite) != 1) {
+    stop(strwrap(prefix = " ", initial = "",
+                 "overwrite must be a logical value. Set overwrite to TRUE or
+                 FALSE. The default is set to FALSE. See also
+                 help(benchmark)."))
+  }
+  if (!is.vector(benchmark) || length(benchmark) != length(object$ind$Domain)) {
+    stop(strwrap(prefix = " ", initial = "",
+                 "benchmark must be a vector with length equal to the number of
+                 domains."))
+  }
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -3,15 +3,17 @@
 ################################################################################
 devtools::load_all()
 
-pacman::p_load("dplyr", "data.table", "povmap", "sf", "ggplot2", "viridis")
+pacman::p_load("dplyr", "data.table", "povmap", "sf", "ggplot2", "viridis",
+               "gridExtra")
 
 #### read in the data
 spatial_dt <- readRDS("data-raw/data-full.rds")
 spatial_dt <- spatial_dt$admin2_District
 
-geosurvey_dt <- haven::read_dta("data-raw/SIHBS_SAE.dta")
+geosurvey_dt <- haven::read_dta("data-raw/SIHBS_SAE (1).dta")
 geosurvey_dt <- geosurvey_dt[, c("hhsize", "wgt_adj2", "pcer", "poor_ub",
-                                 "ubpl", "latitude", "longitude")]
+                                 "ubpl", "latitude", "longitude", "admin2Pcod",
+                                 "hhid")]
 geosurvey_dt$population_weight <- geosurvey_dt$wgt_adj2 * geosurvey_dt$hhsize
 
 
@@ -27,23 +29,23 @@ povrate_geocoded <-
   summarise(weighted.mean(x = poor, w = wgt_adj2*hhsize, na.rm = TRUE))
 
 
-geosurvey_dt <-
-  geosurvey_dt %>%
-  filter(!is.na(latitude) & !is.na(longitude)) %>%
-  st_as_sf(crs = 4326,
-           agr = "constant",
-           coords = c("longitude", "latitude"))
+# geosurvey_dt <-
+#   geosurvey_dt %>%
+#   filter(!is.na(latitude) & !is.na(longitude)) %>%
+#   st_as_sf(crs = 4326,
+#            agr = "constant",
+#            coords = c("longitude", "latitude"))
 
 ### ensure we have properly created the geospatial object from the survey data
 shp_dt <- sf::st_read(dsn = "data-raw/som-shapefiles/admin2_District",
                       layer = "admin2_District")
 
 
-ggplot() +
-  geom_sf(data = shp_dt) +
-  geom_sf(data = geosurvey_dt, color = "red", alpha = 0.5, size = 2) +
-  labs(title = "Household Locations in Somalia") +
-  theme_minimal()
+# ggplot() +
+#   geom_sf(data = shp_dt) +
+#   geom_sf(data = geosurvey_dt, color = "red", alpha = 0.5, size = 2) +
+#   labs(title = "Household Locations in Somalia") +
+#   theme_minimal()
 
 
 
@@ -54,21 +56,59 @@ shp_dt <-
   mutate(targetarea_codes = as.integer(targetarea_codes))
 
 
-### merge with household survey
+### merge with household survey with 2 pronged approach (one for the households with admin2Pcod and
+### another for households without admin2Pcod)
 geosurvey_dt <-
   geosurvey_dt %>%
-  st_join(shp_dt)
+  merge(shp_dt %>%
+          st_drop_geometry(),
+        by = "admin2Pcod",
+        all.x = TRUE)
+
+# missing_dt <-
+#   add_dt %>%
+#   filter(admin2Pcod == "" & !is.na(longitude) & !is.na(latitude)) %>%
+#   st_as_sf(crs = 4326,
+#            agr = "constant",
+#            coords = c("longitude", "latitude"))
+# missing_dt$admin2Pcod <-
+#   missing_dt %>%
+#   st_nearest_feature(shp_dt[,colnames(shp_dt)[!colnames(shp_dt) %in% colnames(add_dt)]]) %>%
+#   shp_dt$admin2Pcod[.]
+#
+#
+# geosurvey_dt <-
+#   add_dt %>%
+#   filter(!admin2Pcod == "") %>%
+#   select("hhsize", "wgt_adj2", "pcer", "poor_ub",
+#          "ubpl", "admin2Pcod", "hhid") %>%
+#   rbind(missing_dt %>%
+#           st_drop_geometry() %>%
+#           select("hhsize", "wgt_adj2", "pcer", "poor_ub",
+#                  "ubpl", "admin2Pcod", "hhid")) %>%
+#   merge(shp_dt[, c("admin0Pcod", "admin1Pcod", "admin2Name",
+#                    "admin2Pcod", "targetarea_codes")] %>%
+#           st_drop_geometry(),
+#         by = "admin2Pcod")
+
+# ggplot() +
+#   geom_sf(data = shp_dt) +
+#   geom_sf(data = missing_dt, color = "red", alpha = 0.5, size = 2) +
+#   labs(title = "Household Locations in Somalia") +
+#   theme_minimal()
+
 
 ### compute poverty rates for households that don't merge
-povrate_geomerged <-
-geosurvey_dt %>%
-  filter(!is.na(admin0Pcod)) %>%
-  mutate(poor = ifelse(pcer < ubpl, 1, 0)) %>%
-  summarise(weighted.mean(x = poor_ub, w = wgt_adj2*hhsize, na.rm = TRUE))
+# povrate_geomerged <-
+# geosurvey_dt %>%
+#   filter(!is.na(admin0Pcod)) %>%
+#   mutate(poor = ifelse(pcer < ubpl, 1, 0)) %>%
+#   summarise(weighted.mean(x = poor_ub, w = wgt_adj2*hhsize, na.rm = TRUE))
 
 
 ### compute fh model
 geosurvey_dt <- as.data.table(geosurvey_dt)
+geosurvey_dt[, population_weight := hhsize * wgt_adj2]
 domsize_dt <-
   geosurvey_dt[, sum(population_weight, na.rm = TRUE), by = targetarea_codes] %>%
   setnames(old = "V1", new = "domsize") %>%
@@ -168,8 +208,6 @@ fhmodel_arcsin <-
 
 
 result_dt <- as.data.table(fhmodel_not$ind)
-
-
 
 
 #### compare province level rates
@@ -273,7 +311,7 @@ write.csv(provpov_dt[, c("admin1Name","Direct", "DirectLB", "DirectUB")] %>% st_
 #   communeshp_dt %>%
 #   merge(result_dt, all = TRUE)
 
-## includ population
+## include population
 povshp_dt <-
   shp_dt %>%
   merge(spatial_dt[, c("admin2Pcod", "estimated_population_current")],
@@ -300,6 +338,129 @@ povshp_dt %>%
   labs(fill = "Population \nof Poor")
 
 ggsave("figures/poverty_map_count_fhmodelnot.png")
+
+povshp_dt <-
+povshp_dt %>%
+  mutate(poppoor = estimated_population_current * FH)
+
+#### save an excel file for Alastair
+write.csv(povshp_dt %>% st_drop_geometry(),
+          "data-clean/ebp_results/povertymap_som.csv")
+
+
+
+#### benchmark the values
+popshare_dt <-
+  fhmodel_not$ind %>%
+  merge(spatial_dt[, c("targetarea_codes", "estimated_population_current", "admin1Pcod")],
+        by.x = "Domain", by.y = "targetarea_codes") %>%
+  group_by(admin1Pcod) %>%
+  mutate(popshare = estimated_population_current / sum(estimated_population_current, na.rm = TRUE))
+
+
+bench_dt <-
+  spatial_dt[, c("targetarea_codes", "admin1Pcod")]%>%
+  merge(geosurvey_dt %>%
+          group_by(admin1Pcod) %>%
+          mutate(poor = ifelse(pcer < ubpl, 1, 0)) %>%
+          summarise(benchrate = weighted.mean(x = poor, w = wgt_adj2*hhsize, na.rm = TRUE)),
+        all.x = TRUE)
+
+### assign the national average to the missing regional poverty rate
+bench_dt[is.na(benchrate), benchrate := 0.674]
+
+
+
+benchrake_dt <- benchmark2(object = fhmodel_not,
+                           benchmark = bench_dt$benchrate,
+                           share = popshare_dt$popshare,
+                           type = "raking",
+                           group = bench_dt$admin1Pcod) %>%
+  setnames(old = "FH_Bench",
+           new = "FH_Bench_rake")
+
+
+benchrate_dt <- benchmark2(object = fhmodel_not,
+                           benchmark = bench_dt$benchrate,
+                           share = popshare_dt$popshare,
+                           type = "ratio",
+                           group = bench_dt$admin1Pcod) %>%
+  setnames(old = "FH_Bench",
+           new = "FH_Bench_ratio")
+
+benchmsea_dt <- benchmark2(object = fhmodel_not,
+                           benchmark = bench_dt$benchrate,
+                           share = popshare_dt$popshare,
+                           type = "MSE_adj",
+                           group = bench_dt$admin1Pcod) %>%
+  setnames(old = "FH_Bench",
+           new = "FH_Bench_mse")
+
+
+#### merge all three methods
+result_dt <-
+  result_dt %>%
+  merge(benchrake_dt[, c("Domain", "FH_Bench_rake")]) %>%
+  merge(benchrate_dt[, c("Domain", "FH_Bench_ratio")]) %>%
+  merge(benchmsea_dt[, c("Domain", "FH_Bench_mse")]) %>%
+  merge(spatial_dt[, c("targetarea_codes", "estimated_population_current", "admin1Pcod")],
+        by.x = "Domain", by.y = "targetarea_codes")
+
+#### plot all three maps for the three different benchmarking methods
+
+povshp_dt <-
+  povshp_dt %>%
+  merge(result_dt[, c("Domain", "FH_Bench_rake", "FH_Bench_ratio", "FH_Bench_mse")],
+        by.x = "targetarea_codes", by.y = "Domain")
+
+plot_fh <-
+povshp_dt %>%
+  ggplot() +
+  geom_sf(aes(fill = FH)) +
+  scale_fill_viridis(option = "H") +
+  theme_bw() +
+  labs(fill = "Poverty Rate")
+
+plot_fhrake <-
+  povshp_dt %>%
+  ggplot() +
+  geom_sf(aes(fill = FH_Bench_rake)) +
+  scale_fill_viridis(option = "H") +
+  theme_bw() +
+  labs(fill = "Benchmark Poverty Rate \n (Raking Method)")
+
+plot_fhratio <-
+  povshp_dt %>%
+  ggplot() +
+  geom_sf(aes(fill = FH_Bench_ratio)) +
+  scale_fill_viridis(option = "H") +
+  theme_bw() +
+  labs(fill = "Benchmark Poverty Rate \n (Ratio Method)")
+
+plot_fhmse <-
+  povshp_dt %>%
+  ggplot() +
+  geom_sf(aes(fill = FH_Bench_mse)) +
+  scale_fill_viridis(option = "H") +
+  theme_bw() +
+  labs(fill = "Benchmark Poverty Rate \n (MSE Adjustment)")
+
+pdf("figures/poverty_map_fhmodelnot_withbenchmarking.pdf", width = 10, height = 12)
+
+grid.arrange(grobs = list(plot_fh, plot_fhratio, plot_fhrake, plot_fhmse),
+             nrow = 2)
+
+
+dev.off()
+
+write.csv(result_dt, "data-clean/ebp_results/povmap_benchmark.csv")
+
+
+
+
+
+
+
 
 
 

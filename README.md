@@ -66,13 +66,13 @@ descriptives_dt
 |                         |              |
 |:------------------------|-------------:|
 | tot_pop_million         |   16.9000000 |
-| pop_hhs_million         |   13.1000000 |
-| svy_hhs                 | 5957.0000000 |
-| povrate_ipl.povrate_ipl |    0.5105000 |
+| pop_hhs_million         |   13.6000000 |
+| svy_hhs                 | 6221.0000000 |
+| povrate_ipl.povrate_ipl |    0.5135000 |
 | recent_census           | 1986.0000000 |
 | region_count_sample     |   17.0000000 |
-| median_cv_region.median |    0.1116432 |
-| mean_cv_region.mean     |    0.1038039 |
+| median_cv_region.median |    0.0980073 |
+| mean_cv_region.mean     |    0.0974519 |
 | num_targets_pop         |   74.0000000 |
 | num_targets_sample      |   74.0000000 |
 
@@ -89,29 +89,30 @@ summary(fhmodel_not)
 #>     domains = "targetarea_codes", method = "ml", MSE = TRUE, 
 #>     mse_type = "analytical")
 #> 
-#> Out-of-sample domains:  30 
-#> In-sample domains:  44 
+#> Out-of-sample domains:  26 
+#> In-sample domains:  48 
 #> 
 #> Variance and MSE estimation:
 #> Variance estimation method:  ml 
-#> Estimated variance component(s):  0.02881221 
+#> Estimated variance component(s):  0.0265102 
 #> MSE method:  datta-lahiri 
 #> 
 #> Coefficients:
-#>                     coefficients std.error t.value               p.value    
-#> (Intercept)             0.481006  0.033122 14.5224 < 0.00000000000000022 ***
-#> prodmt_reg_shr_trof     0.038881  0.013741  2.8296              0.004661 ** 
+#>                       coefficients  std.error t.value               p.value    
+#> (Intercept)              0.4992352  0.0322778 15.4668 < 0.00000000000000022 ***
+#> prodmt_reg_shr_trof      0.0377582  0.0132481  2.8501              0.004371 ** 
+#> share_pop_in_2km_grid   -0.0039392  0.0017801 -2.2130              0.026899 *  
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Explanatory measures:
-#>    loglike       AIC       BIC       KIC      AdjR2     FH_R2
-#> 1 7.170699 -8.341398 -2.988829 -5.341398 0.09978972 0.1488029
+#>    loglike      AIC       BIC      KIC     AdjR2     FH_R2
+#> 1 11.21415 -14.4283 -6.943498 -10.4283 0.2042772 0.2858004
 #> 
 #> Residual diagnostics:
 #>                          Skewness Kurtosis Shapiro_W  Shapiro_p
-#> Standardized_Residuals  0.4551309 2.553501 0.9566187 0.09723726
-#> Random_effects         -0.3829764 2.735962 0.9682970 0.26314332
+#> Standardized_Residuals  0.2866244 2.506503 0.9810603 0.62340843
+#> Random_effects         -0.8067306 3.786225 0.9514560 0.04570867
 #> 
 #> Transformation: No transformation
 ```
@@ -188,20 +189,20 @@ provpov_dt[, c("admin1Name","Direct", "DirectLB", "DirectUB")] %>%
 
 | admin1Name      |    Direct |  DirectLB |  DirectUB |
 |:----------------|----------:|----------:|----------:|
-| Awdal           | 0.3141669 | 0.2150335 | 0.4133003 |
-| Woqooyi Galbeed | 0.4176301 | 0.3227681 | 0.5124920 |
-| Togdheer        | 0.3735306 | 0.2863863 | 0.4606750 |
-| Sool            | 0.3415321 | 0.2444791 | 0.4385851 |
-| Sanaag          | 0.3540535 | 0.2558645 | 0.4522424 |
-| Bari            | 0.3908614 | 0.3040931 | 0.4776296 |
-| Nugaal          | 0.2995517 | 0.2304062 | 0.3686972 |
-| Mudug           | 0.6647001 | 0.5471461 | 0.7822541 |
-| Galgaduud       | 0.4991713 | 0.3794388 | 0.6189038 |
-| Hiraan          | 0.8136568 | 0.6992680 | 0.9280456 |
+| Awdal           | 0.3426772 | 0.2538477 | 0.4315068 |
+| Woqooyi Galbeed | 0.4272366 | 0.3395676 | 0.5149055 |
+| Togdheer        | 0.4062082 | 0.3220723 | 0.4903441 |
+| Sool            | 0.4502007 | 0.3477275 | 0.5526739 |
+| Sanaag          | 0.3628377 | 0.2659533 | 0.4597222 |
+| Bari            | 0.3660112 | 0.2845638 | 0.4474587 |
+| Nugaal          | 0.3490663 | 0.2763029 | 0.4218297 |
+| Mudug           | 0.6787627 | 0.5681693 | 0.7893562 |
+| Galgaduud       | 0.5089052 | 0.4158070 | 0.6020035 |
+| Hiraan          | 0.8153432 | 0.6996824 | 0.9310041 |
 | Middle Shabelle | 0.8658882 | 0.7393780 | 0.9923985 |
-| Banadir         | 0.3669768 | 0.2866746 | 0.4472789 |
-| Lower Shabelle  | 0.5237753 | 0.4514877 | 0.5960628 |
+| Banadir         | 0.4396671 | 0.3740864 | 0.5052479 |
+| Lower Shabelle  | 0.5338817 | 0.4363581 | 0.6314054 |
 | Bay             | 0.5716629 | 0.4618497 | 0.6814760 |
-| Bakool          | 0.7350966 | 0.6220630 | 0.8481303 |
-| Gedo            | 0.5205976 | 0.4127040 | 0.6284913 |
-| Lower Juba      | 0.5814703 | 0.4688648 | 0.6940758 |
+| Bakool          | 0.7432180 | 0.6318268 | 0.8546092 |
+| Gedo            | 0.5214980 | 0.4186984 | 0.6242976 |
+| Lower Juba      | 0.5782810 | 0.4675981 | 0.6889638 |

@@ -138,4 +138,5 @@ provpov_dt %>%
 
 provpov_dt[, c("admin1Name","Direct", "DirectLB", "DirectUB")] %>%
   kable()
+
 ```
