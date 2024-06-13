@@ -153,6 +153,40 @@ candidate_vars <- colnames(spatial_dt)[!(colnames(spatial_dt) %in%
                                              "admin2Pcod", "year", "estimated_population_current",
                                              "targetarea_codes", "Direct", na_vars))]
 
+### include Kamwoo's wealth indices
+wealth_dt <-
+  read.csv("data-raw/SOM_estimated_wealth_index.csv") %>%
+  st_as_sf(crs = 4326,
+           agr = "constant",
+           coords = c("lon", "lat")) %>%
+  select(country_name, img_prob_poor, img_prob_lower_middle,
+         img_prob_upper_middle, img_prob_rich, estimated_IWI)
+
+wealth_cols <- c("img_prob_poor", "img_prob_lower_middle",
+                 "img_prob_upper_middle", "img_prob_rich",
+                 "estimated_IWI")
+
+### compute target area averages
+wealth_dt <-
+  wealth_dt %>%
+  st_join(shp_dt) %>%
+  st_drop_geometry() %>%
+  group_by(targetarea_codes) %>%
+  summarise(img_prob_poor = mean(img_prob_poor, na.rm = TRUE),
+            img_prob_lower_middle = mean(img_prob_lower_middle, na.rm = TRUE),
+            img_prob_upper_middle = mean(img_prob_upper_middle, na.rm = TRUE),
+            img_prob_rich = mean(img_prob_rich, na.rm = TRUE),
+            estimated_IWI = mean(estimated_IWI, na.rm = TRUE))
+
+### include dummies
+spatial_dt <- merge(spatial_dt, wealth_dt, by = "targetarea_codes")
+
+dummy_dt <- as.data.table(dummify(spatial_dt$admin1Pcod))
+
+spatial_dt <- cbind(spatial_dt, dummy_dt)
+
+candidate_vars <- c(candidate_vars, colnames(wealth_dt), colnames(dummy_dt))
+
 selvars_list <- countrymodel_select(dt = spatial_dt[!is.na(Direct),],
                                     xvars = candidate_vars,
                                     y = "Direct")
@@ -359,12 +393,12 @@ popshare_dt <-
 
 
 bench_dt <-
-  spatial_dt[, c("targetarea_codes", "admin1Pcod")]%>%
+  spatial_dt[, c("targetarea_codes", "admin1Pcod")] %>%
   merge(geosurvey_dt %>%
           group_by(admin1Pcod) %>%
           mutate(poor = ifelse(pcer < ubpl, 1, 0)) %>%
           summarise(benchrate = weighted.mean(x = poor, w = wgt_adj2*hhsize, na.rm = TRUE)),
-        all.x = TRUE)
+        all.x = TRUE, by = "admin1Pcod")
 
 ### assign the national average to the missing regional poverty rate
 bench_dt[is.na(benchrate), benchrate := 0.674]

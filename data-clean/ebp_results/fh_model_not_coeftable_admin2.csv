@@ -1,4 +1,5 @@
 "","variables","coefficients","std_error"
-"1","(Intercept)","0.499***","0.032"
-"2","prodmt_reg_shr_trof","0.038**","0.013"
+"1","(Intercept)","0.502***","0.033"
+"2","prodmt_reg_shr_trof","0.024","0.024"
 "3","share_pop_in_2km_grid","-0.0039**","0.002"
+"4","SO21","0.148","0.224"
