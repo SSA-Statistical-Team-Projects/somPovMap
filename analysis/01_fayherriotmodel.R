@@ -14,6 +14,12 @@ geosurvey_dt <- haven::read_dta("data-raw/SIHBS_SAE (1).dta")
 geosurvey_dt <- geosurvey_dt[, c("hhsize", "wgt_adj2", "pcer", "poor_ub",
                                  "ubpl", "latitude", "longitude", "admin2Pcod",
                                  "hhid")]
+
+#### we need to remove the 3 areas the NSO flag as missing spatial_dt and the
+#### survey
+geosurvey_dt <- geosurvey_dt[!geosurvey_dt$admin2Pcod %in%
+                               c("SO1104", "SO1503", "SO2601"),]
+
 geosurvey_dt$population_weight <- geosurvey_dt$wgt_adj2 * geosurvey_dt$hhsize
 
 
@@ -47,10 +53,6 @@ shp_dt <- sf::st_read(dsn = "data-raw/som-shapefiles/admin2_District",
 #   labs(title = "Household Locations in Somalia") +
 #   theme_minimal()
 
-#### we need to remove the 3 areas the NSO flag as missing spatial_dt and the
-#### survey
-geosurvey_dt <- geosurvey_dt[!geosurvey_dt$admin2Pcod %in%
-                               c("SO1104", "SO1503", "SO2601"),]
 
 
 ### poverty mapping time!
