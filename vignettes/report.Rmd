@@ -1,0 +1,380 @@
+---
+title: "Small Area Estimation of Poverty in Somalia : A Fay Herriot Model Approach"
+author: "Ifeanyi Edochie"
+date: "2024-06-20"
+output: 
+  bookdown::word_document2:
+    reference_docx: report_style.docx
+fontsize: 10pt
+always_allow_html: true
+bibliography: bibliography.bib
+nocite: | 
+  @CARRAO2016108, @nelson2019suite, @nhess-20-695-2020
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+
+# BiocManager::install("kable", update = FALSE, validate = FALSE)
+
+pacman::p_load(here, ggplot2, sf, sfnetworks, kableExtra, dplyr, data.table, 
+               viridis, paletteer, ggthemes, gridExtra, grid, flextable,
+               showtext, extrafont, bookdown, officer)
+
+sf::sf_use_s2(FALSE)
+
+
+source(here("analysis/01_fayherriotmodel.R"))
+
+
+median_dist_cv <- round(median(spatial_dt$CV, na.rm = TRUE)/100, 2)
+mean_dist_cv <- round(mean(spatial_dt$CV, na.rm = TRUE)/100, 2)
+
+median_region_cv <- round(median(provpov_dt$CV/100, na.rm = TRUE), 3)
+mean_region_cv <- round(mean(provpov_dt$CV/100, na.rm = TRUE), 3)
+
+```
+### Introduction
+
+Household surveys are often representative at the national level or at the level of the first administrative division (region/state level). National Statistical Offices and government entities can benefit from poverty estimation at a higher level of resolution, such as the commune or district level. This note describes the small area estimation (SAE) methodology implemented to estimate poverty rates in Somalia at the district level. SAE is a statistical method that can be used to improve the reliability of survey estimates by combining survey data with geographically comprehensive auxiliary data, such as census when available or geospatial, remotely sensed data. In Burundi, we show that SAE generates poverty estimates that are sufficiently precise to report at the commune level instead of the regional level. This has the potential to improve the targeting and evaluation of interventions intended to achieve poverty reduction in the future.
+Ideally, SAE combines survey data with household-level data from a recent census. Countries often aim to collect census data every 10 years. However, many African countries take more years between consecutive censuses, and indeed Somalia's last census was conducted in 1986. Therefore, this exercise relies on contemporaneous geospatial data derived from a variety of sources. [@battese1988error] were the first to use geospatial satellite data in the context of crop production. Other studies [@georganos2019modelling], [@chi2022microestimates] have used satellite imagery to predict wealth indices, and [@van2023accurate] used satellite imagery to predict monetary poverty in Malawi  . In this note, we present the approach that models poverty rates at the commune level in Burundi using the model of [@fay1979estimates]. The area level model approach allows us to relate commune level direct survey poverty rates to auxiliary variables (geospatial indicators) to estimate poverty rates in all communes within Burundi.  [@seitz2019they] provides district level poverty rates in the Central Asia region using Fay Herriot modelling approach using auxiliary geospatial data. 
+The World Bank has employed the SAE methodology extensively to estimate poverty and other socioeconomic indicators of interest at more granular levels and continues to produce these estimates in combination with other non-monetary measures of poverty. At this point, SAE has been applied in a wide variety of contexts across many developing countries. This note is subdivided as follows. In section 2, we present survey data (specifically the household consumption data) and why SAE is necessary for commune level poverty estimation in Burundi. We also present the Fay-Herriot model as described by [@fay1979estimates]. Section 3 describes the geospatial databases sourced and indicators created as well as the model selection process employed. Sections 4 and 5 describes the FH model results and the poverty maps for the country. 
+
+
+### The Data
+
+For Somalia, the 2022 Somalia Integrated Household Budget Survey (SIHBS) is representative at the regional level. Hence, commune level poverty rate estimates computed from this survey will be insufficiently precise and unreliable for publication. \@ref(tab:tab1) illustrates why it is necessary to use SAE to report poverty rates at more disaggregated geographic levels in Somalia. We use the mean coefficient of variation (CV) as a standardized measure of precision (i.e. the square root of the estimated mean square error divided by the poverty rate). Differing thresholds for mean or median CVs, often ranging from 0.1 to 0.3, have been applied by National Statistics Offices to determine if statistics are sufficiently reliable to report.  The median and mean direct CVs in Somalia at the district level are approximately `r median_dist_cv` and `r mean_dist_cv`. While this is within the acceptable range of reliability for some countries, it is not considered reliable enough to publish by the Somalia National Statistics Office. At the regional (admin 1) level, the mean and median CVs are approximately `r mean_region_cv` and `r median_region_cv`, which is considered publishable.  
+
+```{r, echo = FALSE}
+
+specify_decimal <- function(x, k) trimws(format(round(x, k), nsmall=k))
+
+descriptives_dt <- 
+  data.table(tot_pop_million = round(sum(spatial_dt$estimated_population_current, na.rm = TRUE)/1e6, 1),
+             pop_hhs_million = round(sum(geosurvey_dt$population_weight, na.rm = TRUE)/1e6, 1),
+             svy_hhs = nrow(geosurvey_dt),
+             povrate_ipl = 
+               geosurvey_dt %>%
+               summarise(povrate_ipl = weighted.mean(x = poor,
+                                                     w = population_weight,
+                                                     na.rm = TRUE)) %>%
+               round(4),
+             recent_census = 1986 %>% as.integer(),
+             region_count_sample = length(unique(geosurvey_dt$admin1Pcod[!is.na(geosurvey_dt$admin1Pcod)])),
+             median_cv_region = 
+               directpov_dt %>%
+               summarize(median = median(directpov_dt$CV/100, na.rm = TRUE)),
+             mean_cv_region = 
+               directpov_dt %>%
+               summarize(mean = weighted.mean(x = directpov_dt$CV/100, 
+                                              w = directpov_dt$SampSize,
+                                              na.rm = TRUE)),
+             num_targets_pop = length(unique(spatial_dt$admin2Pcod[!is.na(spatial_dt$admin2Pcod)])),
+             num_targets_sample = length(unique(geosurvey_dt$admin2Pcod[!is.na(geosurvey_dt$admin2Pcod)]))) %>%
+  t() %>%
+  data.frame()
+
+colnames(descriptives_dt) <- "Estimate"
+
+  data.table(Indicator = c("Population (in millions)", 
+                           "Population Number of HHs (in millions)",
+                           "Sample # of HHs",
+                           "Poverty Rate (IPL)",
+                           "Latest Census Year",
+                           "Number of Regions",
+                           "Region Median CV", 
+                           "Region Mean CV",
+                           "Number of Targets (Population)",
+                           "Number of Targets (Sample)"),
+             Estimate = descriptives_dt$Estimate) %>%
+    flextable() %>%
+    colformat_num(j = "Estimate", digits = 3) %>%
+    colformat_num(j = "Estimate", i = c(3, 5, 6, 9, 10), digits = 0) %>%
+    colformat_num(j = "Estimate", i = 5,  big.mark = "") %>%
+    set_table_properties(width = 0.5, layout = "autofit") %>%
+    fontsize(size = 10) %>%
+    font(fontname = "Times New Roman", part = "all") %>%
+    autofit() %>%
+    theme_box() %>%
+    set_caption(caption = "Descriptive Statistics",
+                style = "Table Caption",
+                autonum = run_autonum(seq_id = "tab", 
+                                      bkm = "tab1"))
+  
+```
+
+We utilize freely available geospatial data for this small area estimation exercise since the last census carried out is outdated 1986. The goal of the SAE exercise is to estimate more reliable district level poverty rates in Somalia by using a Fay Herriot model based on relating the target area direct estimate poverty rates and commune level geospatial indicators. Given that any recent developments in Burundi might not be captured by its 15-year-old census, it would be difficult to make a case for area poverty rates estimated using the 1981 census particularly to guide current policy interventions.  
+
+
+### The Methodology
+[@corral2022guidelines] recommends implementing an area level Fay Herriot level model with geospatial indicators for poverty mapping. Imagine a finite population for Somalia, \( P \), that consists of \( N \)  households that are subdivided into \( D \) districts with sizes \( N_1, \ldots, N_D \). A random sample of households can be drawn from the \( d^{th} \) commune (i.e., \( n_1, \ldots, n_d \quad \text{s.t.}\quad \; n < N \). The Fay-Herriot (FH) model comprises of two levels. The first is a sample model which assumes a direct survey estimator: 
+
+$$
+\hat{\theta}_i^{Dir} = \theta_i  + e_i, \qquad\forall_i = 1,\ldots,D
+$$
+\(  \hat{\theta}_i^{Dir} \) is design unbiased for the small area parameter, \( \theta_i \) the population indicator of interest, in this case, the poverty rate each district, \( d_i \). We assume a sample error \( e_i \) with the usual independently and normally distribution properties. 
+
+$$
+e_i \sim N(0, \sigma_{e_i}^2)
+$$
+
+In the second level, a linking model is assumed to relate \( \theta_i \) to auxiliary variables \( x_i = (x_{i1}, \ldots, x_{ic})' \) via a linear regression. Both levels of the model together are presented as follows:
+
+$$ \hat{\theta}_i^{Dir} = x_i^{\mathcal{T}}\beta + \mu_i + e_i; \quad \mu_i \sim N(0, \sigma_{\mu}^2); \quad \forall i = 1,\ldots,D 
+$$
+
+The empirical best linear unbiased estimators (EBLUP) \( \beta \) are computed with by weighted least squares regression. The EBLUP of \( \theta_i \) is obtained by substituting the variance parameter \( \sigma_{\mu}^2 \) with an estimate. The resulting estimator can then be written as: 
+
+$$ \hat{\theta}_i^{FH} = x_i^{\mathcal{T}}\hat{\beta} + \mu_i $$
+
+$$ \hat{\theta}_i^{FH} = \hat\gamma_i \theta_i^{\mathcal{T}} + (1 - \hat\gamma_i)x_i\hat{\beta} $$
+
+The EBLUP/FH estimator can be understood as a weighted average of the direct estimator and a regression synthetic part. The estimated shrinkage factor \( \hat\gamma_i = \frac{\hat\sigma_{\mu}^2}{\hat\sigma_{\mu}^2 + \hat\sigma_{\varepsilon_i}^2} \) puts more weight on the direct estimator when the sampling variance is small and vice versa. Areas for which no direct estimation results are called out-of-sample domains. For those domains the prediction reduces the regression-synthetic component \( \hat{\theta}_{i,out}^{FH} = x_i^{\mathcal{T}}\hat{\beta} \) [@molinarao]. This model is then fit via a restricted maximum likelihood (REML) method. 
+
+This method is widely used by the Small Area Income and Poverty Estimates (SAIPE) program of the US census bureau and has been thoroughly validated in [@corral2023poverty]. This approach improves the error efficiency rates over the direct estimates at the target area level. Inter-area unexplained heterogeneous area effects are accounted for within the model. Section 3.3 in [@corral2022guidelines] provides a full list of pros and cons of the Fay-Herriot modelling approach. 
+
+### The Geospatial Data and Model Selection Process
+The process leading up to model selection involves sourcing freely available geospatial indicators that might be correlated with household welfare and poverty. The geospatial features were sourced at native resolution and then zonal statistics were computed at the target area level (districts). \@ref(tab:tab5) shows all the geospatial features and the data sources employed.  
+
+```{r, echo = FALSE}
+
+# Create a data frame to represent your table
+data.frame(
+  Feature = c("Built-settlement extent area", 
+              "Gridded Population & Density", 
+              "Share of area planted by crop for banana, beans, cassava, maize, sesame seed, sorghum, sugar cane, temperature fruit,
+              tropical fruit, vegetables", 
+              "Production quantity for each crop for banana, beans, cassava, maize, sesame seed, sorghum, sugar cane, temperature
+              fruit, tropical fruit, vegetables", 
+              "% production as a total crop production for banana, beans, cassava, maize, sesame seed, sorghum, sugar cane,
+              temperature fruit, tropical fruit, vegetables", 
+              "Standardized precipitation evaporation index, 12 month", 
+              "Drought exposure, Drought hazard, Drought risk index, Drought vulnerability", 
+              "Drought hazard, risk for irrigated agricultural systems", 
+              "Percent of area (with Vegetation Index below 40) for the Gu season (April - June)", 
+              "Average travel time in nearest urban areas with 5000km, 20000km and 50000km"),
+  Source = c("WorldPop Building Footprints", 
+             "WorldPop Gridded Population Counts & Density", 
+             "IFPRI Spatial Production Allocation Model (SPAM)", 
+             "IFPRI Spatial Production Allocation Model (SPAM)", 
+             "IFPRI Spatial Production Allocation Model (SPAM)", 
+             "Global SPEI database, version 4.03", 
+             "(Carrao et al. 2018)", 
+             "Drought risk for rainfed, irrigated agric. systems aggregated as an average per polygon based on the data from
+             (Meza et al. 2020)", 
+             "STAR - Global Vegetation Health Products", 
+             "Computed based on population data from WorldPop and accessibility data from (Nelson et al. 2019)"),
+  Original_Data_Resolution = c("1km", "90m", "10km", "10km", "10km", "0.5 degrees", "0.5 degrees", "", "", ""),
+  Year = c("2001 - 2020", "2020", "2009, 2017, 2020", "2009, 2017, 2020", "2009, 2017, 2020", "2020", "2000-2014", "2020",
+           "2017-2022", "2019")) %>%
+  flextable() %>%
+  set_table_properties(width = 1, layout = "autofit") %>%
+  fontsize(size = 10) %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  autofit() %>%
+  set_caption(caption = "EBP Model (Regression Results)",
+              style = "Table Caption",
+              autonum = run_autonum(seq_id = "tab", bkm = "tab5")) %>%
+  theme_box()
+
+```
+
+
+We begin by transforming all indicators as necessary to minimize the risk of divergence in model parameter estimation. For indicator with values greater than 100, we take the natural logarithm. We have avoiding feature scaling to avoid excessive distortion or loss of information for the scaled variables.
+
+The geospatial data listed under the previous header was used to construct candidate features, at the grid and target area level. In addition, we include regional dummy variables. In all, we created ~157 potential geospatial candidate indicators. Using all these features in the linear mixed model risks potentially leads to overfitting the survey sample and generates poor out-of-sample estimations. 
+
+Next, we employ a Least Absolute Shrinkage and Selection Operator (LASSO) model selection approach which selects a predictive set of variables while avoiding model over fitting. In particular, we use the rlasso function with the hdm R package [@bach2018valid] which allows for selecting the optimal lambda parameter by minimizing the Bayesian Information Criterion (BIC) based on coefficients that are not shrunk towards zero. We employ this approach because we are using the LASSO to select variables for use as predictors in the Fay Herriot Model. The dependent variable under the model selection is the commune (target area) level direct poverty rate. 
+
+### Fay Herriot Model Estimation Results
+The final selected model includes covariates share of the population within a 2km grid as well as the share of total production that is tropical fruit production. The regression results are as follows: 
+
+```{r, echo = FALSE}
+
+fh_reportcoef_table(fhmodel_not) %>%
+    setnames(new = c("Variables", "Coefficients", "Standard Error")) %>%
+    mutate(Variables = case_when(
+    Variables == "(Intercept)" ~ "Intercept",
+    Variables == "prodmt_reg_shr_trof" ~ "Production share in Tropical Fruit Production",
+    Variables == "share_pop_in_2km_grid" ~ "Average share of population within 2km grids",
+    TRUE ~ Variables
+  )) %>%
+  flextable() %>%
+  set_table_properties(width = 0.5, layout = "autofit") %>%
+  fontsize(size = 10) %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  autofit() %>%
+  set_caption(caption = "EBP Model (Regression Results)",
+              style = "Table Caption",
+              autonum = run_autonum(seq_id = "tab", bkm = "tab2")) %>%
+  theme_box()
+
+norm_dt <- 
+fh_normality_fit(fhmodel_not) %>%
+  mutate(value = specify_decimal(value, 3)) %>%
+  t() %>%
+  as.data.frame() 
+
+```
+
+The regression coefficients have the expected sign. The share of the population within the 2km grid is decreasing in poverty i.e. districts with more densely populated grids appear to be more well off (i.e. less poor). This may indicate that higher density areas attract individuals with more income or earning potential. 
+
+Several assumptions are made in this model which needed to be verified. The Fay Herriot model \( R^2 \) equals 28.5% `r as.numeric(norm_dt$rsq_conditional)*100` with an adjusted \( R^2 \) of `r as.numeric(norm_dt$rsq_marginal)*100` which is typical for the FH model particularly with only 48 in-sample districts used in the regression of only geospatial features. We assume independent normal distributions for the area effects as well as error terms. The table shows the skewness and kurtosis which should be approximately 0 and 3 for normally distributed random variables. 
+
+```{r, echo = FALSE}
+
+
+colnames(norm_dt) <- norm_dt[1,]
+norm_dt <- norm_dt[-1,]
+
+norm_dt %>%
+  as.data.frame() %>%
+  flextable() %>%
+  set_header_labels(rsq_marginal = "marginal",
+                    rsq_conditional = "conditional",
+                    epsilon_skewness = "skewness",
+                    epsilon_kurtosis = "kurtosis",
+                    random_skewness = "skewness",
+                    random_kurtosis = "kurtosis") %>%
+  add_header_row(values = c("Model R\u00B2", "(Error Term) \u03B5", "(Random Effect) \u03BC"), 
+                 colwidths = c(2, 2, 2)) %>%
+  set_table_properties(width = 0.5, layout = "autofit") %>%
+  fontsize(size = 10) %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  theme_box() %>%
+  autofit() %>%
+  set_caption(caption = "Assessing Normality Assumptions",
+              style = "Table Caption",
+              autonum = run_autonum(seq_id = "tab", bkm = "tab3"))
+
+```
+
+The normality assumptions proposed in the method section matter for the noise estimates but the empirical bayes methodology ensures that the poverty estimates are unbiased. The residual analysis suggests that the skewness and kurtosis of the idiosyncratic and district level area effects match the normality assumptions. However, there appears to be few outliers within the error term normal density plot \@ref(tab:tab3). The residual plots for both the random error and idiosyncratic errors can be found below: 
+
+```{r fig1, echo = FALSE, fig.cap = "Fay-Herriot Residual Plots"}
+
+### density plots for the idiosyncratic errors and random effects
+
+plot_random <- 
+  fhmodel_not$model$random_effects[,1] %>%
+  as.data.table() %>%
+  setnames(new = "values") %>%
+  ggplot() + 
+  geom_density(aes(x = values), fill = "blue", alpha = 0.5) + 
+  labs(x = "Random Effects", y = "Density", title = "Random Effect Residuals (\u03BC)") + 
+  theme_minimal()
+
+plot_error <- 
+  unname(fhmodel_not$model$std_real_residuals[,1]) %>%
+  as.data.table() %>%
+  setnames(new = "values") %>%
+  ggplot() + 
+  geom_density(aes(x = values), fill = "blue", alpha = 0.5) + 
+  labs(x = "Error Terms", y = "Density", title = "Model Error Residuals (\u03B5)") + 
+  theme_minimal()
+
+grid.arrange(grobs = list(plot_random, plot_error), nrow = 1)
+
+```
+
+### Poverty Maps
+As a final check, the FH poverty rates at the district level are aggregated to the province level to compare against the direct estiamtes. The province level is the highest level of resolution at which survey design specifies national representativeness. The direct estimates in \@ref(fig:fig2) are shown as 95% confidence intervals (in red) which are plotted in comparison with Fay Herriot poverty estimates. 
+
+```{r fig2, echo = FALSE, fig.cap = "Province Fay-Herriot Estimates"}
+
+provpov_dt %>%
+  ggplot(aes(x = admin1Name)) +
+  geom_point(aes(y = provFH), color = "blue", size = 2) +  # Plotting provFH
+  geom_errorbar(aes(ymin = DirectLB, ymax = DirectUB), width = 0.2, color = "red") +  # Error bars for DirectLB and DirectUB
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +  # Adding a horizontal line at y = 0
+  labs(x = "Province", 
+       y = "Poverty Rate",
+       caption = "Note: Author calculations of Direct Estimate 95% CI at the \nprovince level (Red error bars) compared with FH
+       estimates at same level (blue dots)") +  # Labeling axes
+  theme_bw() +  # Setting a white background theme
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),  # Angling x-axis text
+        plot.caption = element_text(hjust = 0.5, size = 10)) 
+
+```
+
+The poverty map corresponding to the 2020/21 for Somalia at the district level in the subsequent figures: 
+
+```{r fig3, echo = FALSE, fig.cap = "Somalia Head Count Maps (Rate & Population)"}
+
+### maps for population of poor and head count rates
+povshp_dt %>%
+  ggplot() +
+  geom_sf(aes(fill = FH)) +
+  scale_fill_viridis(option = "H") +
+  theme_bw() +
+  labs(fill = "Head Count \nPoverty Rate")
+
+povshp_dt %>%
+  ggplot() +
+  geom_sf(aes(fill = FH * estimated_population_current)) +
+  scale_fill_viridis(option = "H") +
+  theme_bw() +
+  labs(fill = "Population \n of Poor")
+
+```
+
+
+### Appendix
+
+```{r fig4, echo = FALSE, fig.cap = "Correlation between FH Model Estimates and Direct Estimates at District Level"}
+
+result_dt[!is.na(Direct),] %>%
+  ggplot() +
+  geom_point(aes(x = Direct,
+                 y = FH)) +
+  geom_abline(intercept = 0,
+              slope = 1,
+              color = "red") +
+  ylab("FH Model Estimates") +
+  xlab("Direct Estimates") +
+  theme_bw()
+
+```
+
+
+```{r fig5, echo = FALSE, fig.cap = "Direct survey estimates of headcount poverty"}
+
+provpov_dt %>%
+  select(admin1Name, Direct, DirectLB, DirectUB) %>%
+  mutate(Direct = specify_decimal(Direct, 3)) %>%
+  mutate(DirectLB = specify_decimal(DirectLB, 3)) %>%
+  mutate(DirectUB = specify_decimal(DirectUB, 3)) %>%
+  flextable() %>%
+  colformat_num(j = c("Direct", "DirectLB", "DirectUB"), digits = 3) %>%
+  set_header_labels(
+    admin1Name = "Province",
+    Direct = "Direct Estimate",
+    DirectLB = "Lower Bound",
+    DirectUB = "Upper Bound"
+  ) %>%
+  add_header_row(
+    values = c("", "Survey", "FH Estimate 95% Confidence Intervals"),
+    colwidths = c(1, 1, 2)
+  ) %>%
+  autofit() %>%
+  merge_h(part = "header") %>%
+  align(align = "center", part = "header") %>%
+  bg(i = ~Direct < DirectLB | Direct > DirectUB, bg = "red") %>%
+  set_table_properties(width = 0.5, layout = "autofit") %>%
+  fontsize(size = 10) %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  theme_box()
+
+```
+
+### References
+
+
+
+
+

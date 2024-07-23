@@ -4,7 +4,7 @@
 devtools::load_all()
 
 pacman::p_load("dplyr", "data.table", "povmap", "sf", "ggplot2", "viridis",
-               "gridExtra")
+               "gridExtra", "hdm")
 
 #### read in the data
 spatial_dt <- readRDS("data-raw/data-full.rds")

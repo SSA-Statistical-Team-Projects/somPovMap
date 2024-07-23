@@ -103,6 +103,32 @@ fh_reportcoef_table <- function(model,
 
 }
 
+#### model results
+fh_normality_fit <- function(model){
+
+  rsqval_list <- model$model$model_select[c(5, 6)]
+
+  re_skew <- moments::skewness(model$model$random_effects)
+  re_kurt <- moments::kurtosis(model$model$random_effects)
+
+  residual_skew <- moments::skewness(model$model$std_real_residuals)
+  residual_kurt <- moments::kurtosis(model$model$std_real_residuals)
+
+  table_dt <-
+    data.frame(indicator = c("rsq_marginal", "rsq_conditional",
+                             "epsilon_skewness", "epsilon_kurtosis",
+                             "random_skewness", "random_kurtosis"),
+               value = c(rsqval_list[[1]], rsqval_list[[2]],
+                         residual_skew, residual_kurt,
+                         re_skew, re_kurt))
+
+  return(table_dt)
+
+
+}
+
+
+
 ### modify the benchmark function for FH to support group benchmarking
 
 
