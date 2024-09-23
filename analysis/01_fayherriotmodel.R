@@ -455,16 +455,37 @@ dev.off()
 
 write.csv(result_dt, "data-clean/ebp_results/povmap_benchmark.csv")
 
+###### compare the MSEs from the in-sample areas and then compare
 
+cv_dt <- fhmodel_not$MSE[, c("Direct", "FH")] / fhmodel_not$ind[, c("Direct", "FH")]
 
+cv_dt$Domain <- fhmodel_not$ind$Domain
 
+cv_dt <-
+  cv_dt %>%
+  rename(FHCV = FH,
+         DirectCV = Direct)
 
+cv_dt <- merge(cv_dt, povshp_dt, by.x = "Domain", by.y = "targetarea_codes")
 
+samplestat_dt <-
+  as.data.table(table(geosurvey_dt$targetarea_codes)) %>%
+  setnames(old = c("V1", "N"),
+           new = c("targetarea_codes", "survey_size"))
 
+cv_dt <- merge(cv_dt, samplestat_dt, by.x = "Domain", by.y = "targetarea_codes")
 
-
-
-
+cv_dt %>%
+  ggplot() +
+  geom_point(aes(x = DirectCV, y = FHCV, size = survey_size)) +
+  geom_abline(slope = 1, intercept = 0,    # 45-degree line
+              linetype = "dashed", color = "red") +
+  labs(x = "Direct CV", y = "FH CV",       # Axis labels
+       title = "Scatter plot of Direct CV vs Fay Herriot Model CV") +
+  xlim(c(0, 0.1)) +
+  ylim(c(0, 0.1)) +
+  scale_size_continuous(name = "Sample Size") +
+  theme_minimal()
 
 
 
