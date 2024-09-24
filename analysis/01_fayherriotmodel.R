@@ -1,7 +1,7 @@
 ################################################################################
 ############ QUICK SCRIPT TO CREATE THE POVERTY MAP FOR SOMALIA ################
 ################################################################################
-devtools::load_all()
+# devtools::load_all()
 
 pacman::p_load("dplyr", "data.table", "povmap", "sf", "ggplot2", "viridis",
                "gridExtra")
@@ -15,10 +15,10 @@ geosurvey_dt <- geosurvey_dt[, c("hhsize", "wgt_adj2", "pcer", "poor_ub",
                                  "ubpl", "latitude", "longitude", "admin2Pcod",
                                  "hhid")]
 
-# #### we need to remove the 3 areas the NSO flag as missing spatial_dt and the
-# #### survey
-# geosurvey_dt <- geosurvey_dt[!geosurvey_dt$admin2Pcod %in%
-#                                c("SO1104", "SO1503", "SO2601"),]
+#### we need to remove the 3 areas the NSO flag as missing spatial_dt and the
+#### survey
+geosurvey_dt <- geosurvey_dt[!geosurvey_dt$admin2Pcod %in%
+                               c("SO1104", "SO1503", "SO2601"),]
 
 geosurvey_dt$population_weight <- geosurvey_dt$wgt_adj2 * geosurvey_dt$hhsize
 
@@ -192,6 +192,8 @@ dummy_dt <- as.data.table(dummify(spatial_dt$admin1Pcod))
 spatial_dt <- cbind(spatial_dt, dummy_dt)
 
 candidate_vars <- c(candidate_vars, colnames(wealth_dt), colnames(dummy_dt))
+
+candidate_vars <- candidate_vars[!grepl("plant_area_", candidate_vars)]
 
 selvars_list <- countrymodel_select(dt = spatial_dt[!is.na(Direct),],
                                     xvars = candidate_vars,
@@ -485,7 +487,8 @@ plot_fhmse <-
   theme_bw() +
   labs(fill = "Benchmark Poverty Rate \n (MSE Adjustment)")
 
-pdf("figures/poverty_map_fhmodelnot_withbenchmarking.pdf", width = 10, height = 12)
+pdf("figures/poverty_map_fhmodelnot_withbenchmarking.pdf", width = 10,
+    height = 12)
 
 grid.arrange(grobs = list(plot_fh, plot_fhratio, plot_fhrake, plot_fhmse),
              nrow = 2)
@@ -497,17 +500,51 @@ write.csv(result_dt, "data-clean/ebp_results/povmap_benchmark.csv")
 
 
 
+################################################################################
+##### CHECKING THE SAMPLING STRUCTURE OF THE SIHBS FOR THE 3 PROBLEM AREAS #####
+################################################################################
+
+##### ---------- check for the possibility of undersampling ------------- ######
+
+### first, include the survey weights
+
+povshp_dt <- merge(povshp_dt,
+                   geosurvey_dt %>%
+                     group_by(targetarea_codes) %>%
+                     summarize(population_weight = sum(population_weight, na.rm = TRUE)),
+                   all.x = TRUE)
+
+povshp_dt <- merge(povshp_dt,
+                   saepop_dt[, c("targetarea_codes", "SampSize")],
+                   all.x = TRUE)
+
+povshp_dt <- merge(povshp_dt,
+                   saepop_dt[, c("targetarea_codes", "CV")],
+                   all.x = TRUE)
+
+#### rank CVs
+# write.csv(povshp_dt %>%
+#             st_drop_geometry() %>%
+#             select(admin2Name, CV) %>%
+#             arrange(desc(CV)) %>%
+#             filter(!is.na(CV)),
+#           "data-clean/direct_CV_sample.csv")
+
+# #### include the poverty rates estimated
+# povshp_dt <- merge(povshp_dt,
+#                    fhmodel_not$ind[, c("Domain", "FH", "Out")] %>%
+#                      rename(targetarea_codes = Domain,
+#                             FH_fix = FH))
 
 
+####
 
-
-
-
-
-
-
-
-
+povshp_dt %>%
+  ggplot() +
+  geom_sf(aes(fill = FH)) +
+  scale_fill_viridis(option = "H") +
+  theme_bw() +
+  labs(fill = "Head Count \nPoverty Rate")
 
 
 
