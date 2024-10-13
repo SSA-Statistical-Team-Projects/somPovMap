@@ -4,7 +4,7 @@
 devtools::load_all()
 
 pacman::p_load("dplyr", "data.table", "povmap", "sf", "ggplot2", "viridis",
-               "gridExtra", "hdm")
+               "gridExtra", "hdm", "car", "MASS")
 
 #### read in the data
 spatial_dt <- readRDS("data-raw/data-full.rds")
@@ -105,6 +105,8 @@ geosurvey_dt <-
 #   mutate(poor = ifelse(pcer < ubpl, 1, 0)) %>%
 #   summarise(weighted.mean(x = poor_ub, w = wgt_adj2*hhsize, na.rm = TRUE))
 
+#### compute variance smoothing model
+
 
 ### compute fh model
 geosurvey_dt <- as.data.table(geosurvey_dt)
@@ -153,14 +155,62 @@ candidate_vars <- colnames(spatial_dt)[!(colnames(spatial_dt) %in%
                                              "admin2Pcod", "year", "estimated_population_current",
                                              "targetarea_codes", "Direct", na_vars))]
 
-selvars_list <- countrymodel_select(dt = spatial_dt[!is.na(Direct),],
-                                    xvars = candidate_vars,
-                                    y = "Direct")
+# selvars_list <- countrymodel_select(dt = spatial_dt[!is.na(Direct),],
+#                                     xvars = candidate_vars,
+#                                     y = "Direct")
 
 # haven::write_dta(spatial_dt[!is.na(Direct), c(candidate_vars, "Direct"), with = F],
 #                  "data-clean/som_model_select.dta")
 
-### combine data
+#### create the regional dummies
+dummy_dt <- as.data.table(dummify(spatial_dt$admin1Pcod))
+
+spatial_dt <- cbind(spatial_dt, dummy_dt)
+
+candidate_vars <- c(candidate_vars, colnames(dummy_dt))
+
+candidate_vars <- candidate_vars[!grepl("plant_area_", candidate_vars)]
+
+#### select the top 48 most correlated variables first
+#### checking if there is a statistically significant difference between two
+#### variables
+
+# cor(spatial_dt[is.na(Direct) == FALSE, c("Direct", candidate_vars), with = FALSE])
+
+test_vars <- select_candidates(dt = spatial_dt[is.na(Direct) == FALSE,],
+                               xvars = candidate_vars,
+                               y = "Direct",
+                               N = nrow(domsize_dt),
+                               threshold = 0.80)
+
+test_vars <- test_vars[!(test_vars %in% "rai")]
+
+#### run the stepwise model
+step_model <- stepAIC_wrapper(dt = spatial_dt[is.na(Direct) == FALSE,],
+                              xvars = test_vars[c(1:24)],
+                              y = "Direct")
+
+selvars_list <- names(step_model$coefficients)[!names(step_model$coefficients) %in%
+                                              "(Intercept)"]
+
+
+#### compute the smoothed variance model
+var_dt <- varsmoothie_king(domain = spatial_dt$targetarea_codes[!is.na(spatial_dt$Direct)],
+                           direct_var = spatial_dt$var[!is.na(spatial_dt$Direct)],
+                           sampsize = spatial_dt$SampSize[!is.na(spatial_dt$Direct)],
+                           y = geosurvey_dt$poor)
+
+spatial_dt <- merge(x = spatial_dt,
+                    y = var_dt,
+                    by.y = "Domain",
+                    by.x = "targetarea_codes",
+                    all.x = TRUE)
+
+### replace variance in areas that have less than 20 households
+spatial_dt[SampSize >= 20, var_smooth := var]
+
+
+### combine data for model estimation
 combine_dt <- povmap::combine_data(pop_data = spatial_dt[, c(selvars_list,
                                                              "targetarea_codes"),
                                                          with = FALSE],
@@ -168,25 +218,54 @@ combine_dt <- povmap::combine_data(pop_data = spatial_dt[, c(selvars_list,
                                    smp_data = spatial_dt[!is.na(Direct),
                                                          c("targetarea_codes",
                                                            "Direct",
-                                                           "var",
+                                                           "var_smooth",
                                                            "SampSize"),
                                                          with = FALSE],
                                    smp_domains = "targetarea_codes")
 
-
+#### fh model with no transformation
 fhmodel_not <-
   povmap::fh(fixed = as.formula(paste("Direct ~ ", paste(selvars_list, collapse= "+"))),
-             vardir = "var",
+             vardir = "var_smooth",
              combined_data = combine_dt,
              domains = "targetarea_codes",
              method = "ml",
              MSE = TRUE,
              mse_type = "analytical")
 
+spatial_dt[, logDirect := log(Direct)]
+ltest_vars <- select_candidates(dt = spatial_dt[is.na(Direct) == FALSE,],
+                                xvars = candidate_vars,
+                                y = "logDirect",
+                                N = nrow(domsize_dt),
+                                threshold = 0.80)
+
+ltest_vars <- ltest_vars[!(ltest_vars %in% "rai")]
+
+#### run the stepwise model (log modelling)
+lstep_model <- stepAIC_wrapper(dt = spatial_dt[is.na(logDirect) == FALSE,],
+                               xvars = ltest_vars[c(1:24)],
+                               y = "logDirect")
+
+lselvars_list <- names(lstep_model$coefficients)[!names(lstep_model$coefficients) %in%
+                                                 "(Intercept)"]
+
+lcombine_dt <- povmap::combine_data(pop_data = spatial_dt[, c(lselvars_list,
+                                                             "targetarea_codes"),
+                                                          with = FALSE],
+                                   pop_domains = "targetarea_codes",
+                                   smp_data = spatial_dt[!is.na(Direct),
+                                                         c("targetarea_codes",
+                                                           "Direct",
+                                                           "var_smooth",
+                                                           "SampSize"),
+                                                         with = FALSE],
+                                   smp_domains = "targetarea_codes")
+
 fhmodel_log <-
-  povmap::fh(fixed = as.formula(paste("Direct ~ ", paste(selvars_list, collapse= "+"))),
-             vardir = "var",
-             combined_data = combine_dt,
+  povmap::fh(fixed = as.formula(paste("Direct ~ ", paste(lselvars_list, collapse= "+"))),
+             vardir = "var_smooth",
+             combined_data = lcombine_dt,
              domains = "targetarea_codes",
              method = "ml",
              MSE = TRUE,
@@ -194,10 +273,39 @@ fhmodel_log <-
              transformation = "log",
              backtransformation = "bc_crude")
 
+### arcsin modelling
+spatial_dt[, aDirect := asin(Direct)]
+atest_vars <- select_candidates(dt = spatial_dt[is.na(aDirect) == FALSE,],
+                                xvars = candidate_vars,
+                                y = "aDirect",
+                                N = nrow(domsize_dt),
+                                threshold = 0.80)
+atest_vars <- atest_vars[!(atest_vars %in% "rai")]
+
+astep_model <- stepAIC_wrapper(dt = spatial_dt[is.na(aDirect) == FALSE,],
+                               xvars = atest_vars[c(1:24)],
+                               y = "aDirect")
+
+aselvars_list <- names(astep_model$coefficients)[!names(astep_model$coefficients) %in%
+                                                   "(Intercept)"]
+
+acombine_dt <- povmap::combine_data(pop_data = spatial_dt[, c(aselvars_list,
+                                                              "targetarea_codes"),
+                                                          with = FALSE],
+                                    pop_domains = "targetarea_codes",
+                                    smp_data = spatial_dt[!is.na(Direct),
+                                                          c("targetarea_codes",
+                                                            "Direct",
+                                                            "var_smooth",
+                                                            "SampSize"),
+                                                          with = FALSE],
+                                    smp_domains = "targetarea_codes")
+
+
 fhmodel_arcsin <-
-  povmap::fh(fixed = as.formula(paste("Direct ~ ", paste(selvars_list, collapse= "+"))),
-             vardir = "var",
-             combined_data = combine_dt,
+  povmap::fh(fixed = as.formula(paste("Direct ~ ", paste(aselvars_list, collapse= "+"))),
+             vardir = "var_smooth",
+             combined_data = acombine_dt,
              domains = "targetarea_codes",
              method = "ml",
              MSE = TRUE,
@@ -359,11 +467,12 @@ popshare_dt <-
 
 
 bench_dt <-
-  spatial_dt[, c("targetarea_codes", "admin1Pcod")]%>%
+  spatial_dt[, c("targetarea_codes", "admin1Pcod")] %>%
   merge(geosurvey_dt %>%
           group_by(admin1Pcod) %>%
           mutate(poor = ifelse(pcer < ubpl, 1, 0)) %>%
           summarise(benchrate = weighted.mean(x = poor, w = wgt_adj2*hhsize, na.rm = TRUE)),
+        by = "admin1Pcod",
         all.x = TRUE)
 
 ### assign the national average to the missing regional poverty rate
@@ -486,6 +595,134 @@ cv_dt %>%
   ylim(c(0, 0.1)) +
   scale_size_continuous(name = "Sample Size") +
   theme_minimal()
+
+
+
+##### remove one cross fold model validation
+validation_list <- lapply(X = 1:nrow(validation_dt),
+                          FUN = function(x){
+
+                            validation_dt <- combine_dt[!is.na(Direct),]
+
+                            validation_dt[targetarea_codes == targetarea_codes[x], Direct := NA]
+
+                            vmodel_obj <-
+                              povmap::fh(fixed = as.formula(paste("Direct ~ ",
+                                                                  paste(selvars_list,
+                                                                        collapse= "+"))),
+                                         vardir = "var_smooth",
+                                         combined_data = validation_dt,
+                                         domains = "targetarea_codes",
+                                         method = "ml",
+                                         MSE = TRUE,
+                                         mse_type = "analytical")
+
+                            pov_dt <- as.data.table(vmodel_obj$ind[is.na(vmodel_obj$ind$Direct),
+                                                                   c("Domain", "FH")])
+
+                            return(pov_dt)
+
+                          })
+
+
+validation_dt <- rbindlist(validation_list)
+
+setnames(validation_dt, "FH", "FH_validation")
+
+write.csv(validation_dt, "data-clean/ebp_results/model_validation_results.csv")
+
+result_dt <- merge(result_dt,
+                   validation_dt)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

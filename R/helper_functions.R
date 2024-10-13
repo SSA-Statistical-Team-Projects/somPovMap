@@ -62,6 +62,39 @@ countrymodel_select <- function(dt, xvars, y){
 }
 
 
+stepAIC_wrapper <- function(dt, xvars, y){
+
+  dt <- as.data.table(dt)
+
+  dt <- dt[,which(unlist(lapply(dt, function(x)!all(is.na(x))))), with = F]
+
+  xvars <- xvars[xvars %in% colnames(dt)]
+
+  dt <- na.omit(dt[,c(y, xvars), with = F])
+
+  xset <- dt[, xvars, with = F]
+
+  y <- dt[,y]
+
+  model_dt <- cbind(y, xset)
+
+  full_model <- lm(y ~ ., data = model_dt)
+
+  ### use the vif method to drop multicollinear variables
+  vif_model <- vif(full_model)
+
+
+  stepwise_model <- stepAIC(full_model,
+                            direction = "both",
+                            trace = 0)
+
+  return(stepwise_model)
+
+}
+
+
+
+
 specify_decimal <- function(x, k) trimws(format(round(x, k), nsmall=k))
 
 #### some povmap style estimation helpers for povmap
@@ -282,6 +315,170 @@ check_benchmark_arguments2 <- function(object, benchmark, share, type,
 
 
 }
+
+
+select_candidates <- function(dt,
+                              y,
+                              xvars,
+                              N,
+                              threshold){
+
+
+  dt <- as.data.table(dt)
+
+  cor_matrix <- cor(dt[, c(y, xvars), with = FALSE])
+
+  # cor_dt <- data.table(vars = names(cor_matrix[,1]),
+  #                      cor = cor_matrix[,1])
+  #
+  # top_vars <- cor_dt[order(abs(cor_dt$cor), decreasing = TRUE),]$vars[2:N+1]
+  cor_matrix <- as.data.frame(cor_matrix)
+
+  cor_matrix$names <- rownames(cor_matrix)
+
+  cor_matrix <- as.data.table(cor_matrix)
+
+  cor_matrix <- melt(cor_matrix,
+                     id.vars = "names",
+                     measure.vars = colnames(cor_matrix)[!(colnames(cor_matrix) %in% "names")])
+
+  cor_matrix <- cor_matrix[!grepl(".1", cor_matrix$names),]
+  cor_matrix <- cor_matrix[!grepl(".1", cor_matrix$variable),]
+
+  ycor_dt <- cor_matrix[cor_matrix$variable == y,]
+  xcor_dt <- cor_matrix[cor_matrix$variable != y,]
+
+  xcor_dt <- xcor_dt[!is.na(xcor_dt$value),]
+
+  xcor_dt <- xcor_dt[abs(xcor_dt$value) < 1,]
+
+  drop_vars <- unique(xcor_dt[abs(xcor_dt$value) >= threshold,]$names)
+
+  #### select the top variables that are on the candidate_vars list
+  ycor_dt <- ycor_dt[order(-ycor_dt$value),]
+
+  top_vars <- ycor_dt$names[!grepl(y, ycor_dt$names)]
+
+  top_vars <- top_vars[!(top_vars %in% drop_vars)]
+
+  ycor_dt <- ycor_dt[ycor_dt$names %in% top_vars,]
+
+  top_vars <- ycor_dt$names[1:N]
+
+  top_vars <- top_vars[!is.na(top_vars)]
+
+  # if (top_vars %in% c("rai", "rri")){
+  #
+  #   top_vars <- top_vars[!(top_vars %in% "rri")]
+  #
+  # }
+
+  return(top_vars)
+
+
+}
+
+
+
+#### some functions for variance smoothing
+varsmoothie_king <- function(domain,
+                             direct_var,
+                             sampsize,
+                             y){
+
+  dt <- data.table(Domain = domain,
+                   var = direct_var,
+                   n = sampsize)
+
+  dt$log_n <- log(dt$n)
+  dt$log_var <- log(dt$var)
+
+  lm_model <- lm(formula = log_var ~ log_n,
+                 data = dt)
+
+  dt$pred_var <- predict(lm_model, newdata = dt)
+
+  dt$var_smooth <- exp(dt$pred_var) * exp(var(y, na.rm = TRUE)/2)
+
+  return(dt[, c("Domain", "var_smooth"), with = F])
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
