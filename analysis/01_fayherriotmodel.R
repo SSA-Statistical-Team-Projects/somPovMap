@@ -599,7 +599,7 @@ cv_dt %>%
 
 
 ##### remove one cross fold model validation
-validation_list <- lapply(X = 1:nrow(validation_dt),
+validation_list <- lapply(X = 1:nrow(combine_dt[!is.na(Direct),]),
                           FUN = function(x){
 
                             validation_dt <- combine_dt[!is.na(Direct),]
@@ -629,10 +629,25 @@ validation_dt <- rbindlist(validation_list)
 
 setnames(validation_dt, "FH", "FH_validation")
 
-write.csv(validation_dt, "data-clean/ebp_results/model_validation_results.csv")
-
 result_dt <- merge(result_dt,
                    validation_dt)
+
+write.csv(validation_dt, "data-clean/ebp_results/model_validation_results.csv")
+
+
+
+#### lets see how well we are predicting
+ggplot(result_dt, aes(x = FH, y = FH_validation)) +
+  geom_point(color = 'blue') +          # Scatter plot
+  geom_abline(slope = 1, intercept = 0, color = 'red', linetype = "dashed") +  # 45-degree line
+  theme_minimal() +                     # Minimal theme for a cleaner look
+  labs(title = "Remove-one Model Validation",
+       x = "FH validation estimates",
+       y = "FH model estimates")  +
+  xlim(c(0, 1)) +
+  ylim(c(0, 1))
+
+
 
 
 
