@@ -1,124 +1,124 @@
 Variable,Labels
-som_bse_2015,
-som_bse_2020,
-som_bse_2001,
-som_bse_2005,
-som_bse_2010,
-som_bse_2015_share,
-som_bse_2020_share,
-som_bse_2001_share,
-som_bse_2005_share,
-som_bse_2010_share,
-som_bse_2020_2001_share,
-som_bse_2020_2001,
-pop_wp,
-pop_wp_rsc,
-pop_wp_dens,
-pop_wp_rsc_dens,
-plant_area_bana_share_in_all_crops,
-plant_area_bean_share_in_all_crops,
-plant_area_cass_share_in_all_crops,
-plant_area_maiz_share_in_all_crops,
-plant_area_sesa_share_in_all_crops,
-plant_area_sorg_share_in_all_crops,
-plant_area_sugc_share_in_all_crops,
-plant_area_temf_share_in_all_crops,
-plant_area_trof_share_in_all_crops,
-plant_area_vege_share_in_all_crops,
-harv_area_bana_share_in_all_crops,
-harv_area_bean_share_in_all_crops,
-harv_area_cass_share_in_all_crops,
-harv_area_maiz_share_in_all_crops,
-harv_area_sesa_share_in_all_crops,
-harv_area_sorg_share_in_all_crops,
-harv_area_sugc_share_in_all_crops,
-harv_area_temf_share_in_all_crops,
-harv_area_trof_share_in_all_crops,
-harv_area_vege_share_in_all_crops,
-prod_quant_bana_share_in_all_crops,
-prod_quant_bean_share_in_all_crops,
-prod_quant_cass_share_in_all_crops,
-prod_quant_maiz_share_in_all_crops,
-prod_quant_sesa_share_in_all_crops,
-prod_quant_sorg_share_in_all_crops,
-prod_quant_sugc_share_in_all_crops,
-prod_quant_temf_share_in_all_crops,
-prod_quant_trof_share_in_all_crops,
-prod_quant_vege_share_in_all_crops,
-prodmt_reg_shr_bana,
-prodmt_reg_shr_bean,
-prodmt_reg_shr_cass,
-prodmt_reg_shr_maiz,
-prodmt_reg_shr_sesa,
-prodmt_reg_shr_sorg,
-prodmt_reg_shr_sugc,
-prodmt_reg_shr_temf,
-prodmt_reg_shr_trof,
-prodmt_reg_shr_vege,
-spei_mean_2020_12,
-carrao_expo,
-carrao_haza,
-carrao_risk,
-carrao_vuln,
-irr_haz,
-irr_risk,
-rain_haz,
-rain_risk,
-vhi_area_gu_2017,
-vhi_area_gu_2018,
-vhi_area_gu_2019,
-vhi_area_gu_2020,
-vhi_area_gu_2021,
-vhi_area_gu_2022,
-vhi_ag_area_gu_2017,
-vhi_ag_area_gu_2018,
-vhi_ag_area_gu_2019,
-vhi_ag_area_gu_2020,
-vhi_ag_area_gu_2021,
-vhi_ag_area_gu_2022,
-vhi_pop_gu_2017,
-vhi_pop_gu_2018,
-vhi_pop_gu_2019,
-vhi_pop_gu_2020,
-vhi_pop_gu_2021,
-vhi_pop_gu_2022,
-travel_50k,
-travel_20k,
-travel_5k,
-rai,
-rri,
-grid_length,
-pop_in_2km_grid,
-pop_in_5km_grid,
-grid_length_per_area,
-som_pop_area,
-som_pop_dens_per_poparea,
-share_pop_in_2km_grid,
-share_pop_in_5km_grid,
-n_health,
-n_health_per_1k,
-num_health,
-num_health_per_1k,
-n_school,
-n_school_per_1k,
-n_conflict_2019,
-n_conflict_2020,
-n_conflict_2022,
-n_conflict_2018,
-n_conflict_2021,
-pop_5km_confl,
-share_pop_5km_confl,
-n_idp,
-people_2km_water,
-share_pop_2km_water,
-population_2022,
-pin_n_2022,
-idp_2022,
-idp_pin_2022,
-pin_p_2022,
-estimated_population_current,
-p3plus_aug_2023_sep_2023,
-p3plus_percentage_aug_2023_sep_2023,
+som_bse_2015,som_bse_2015
+som_bse_2020,som_bse_2020
+som_bse_2001,som_bse_2001
+som_bse_2005,som_bse_2005
+som_bse_2010,som_bse_2010
+som_bse_2015_share,som_bse_2015_share
+som_bse_2020_share,som_bse_2020_share
+som_bse_2001_share,som_bse_2001_share
+som_bse_2005_share,som_bse_2005_share
+som_bse_2010_share,som_bse_2010_share
+som_bse_2020_2001_share,som_bse_2020_2001_share
+som_bse_2020_2001,som_bse_2020_2001
+pop_wp,Population (World Pop)
+pop_wp_rsc,Population adjusted constrained (World Pop)
+pop_wp_dens,Population Density (World Pop) 
+pop_wp_rsc_dens,Population Density adjusted constrained (World Pop)
+plant_area_bana_share_in_all_crops,Planting area for banana as a share of all crops
+plant_area_bean_share_in_all_crops,Planting area for beans as a share of all crops
+plant_area_cass_share_in_all_crops,Planting area for cassava as a share of all crops
+plant_area_maiz_share_in_all_crops,Planting area for maize as a share of all crops
+plant_area_sesa_share_in_all_crops,Planting area for sesame as a share of all crops
+plant_area_sorg_share_in_all_crops,Planting area for sorghum as a share of all crops
+plant_area_sugc_share_in_all_crops,Planting area for sugar as a share of all crops
+plant_area_temf_share_in_all_crops,Planting area for temf as a share of all crops
+plant_area_trof_share_in_all_crops,Planting area for temf as a share of all crops
+plant_area_vege_share_in_all_crops,Planting area for vegetable as a share of all crops
+harv_area_bana_share_in_all_crops,Harvest area for banana as a share of all crops
+harv_area_bean_share_in_all_crops,Harvest area for beans as a share of all crops
+harv_area_cass_share_in_all_crops,Harvest area for cassava as a share of all crops
+harv_area_maiz_share_in_all_crops,Harvest area for maize as a share of all crops
+harv_area_sesa_share_in_all_crops,Harvest area for sesame as a share of all crops
+harv_area_sorg_share_in_all_crops,Harvest area for sorghum as a share of all crops
+harv_area_sugc_share_in_all_crops,Harvest area for sugar as a share of all crops
+harv_area_temf_share_in_all_crops,Harvest area for temf as a share of all crops
+harv_area_trof_share_in_all_crops,Harvest area for temf as a share of all crops
+harv_area_vege_share_in_all_crops,Harvest area for vegetable as a share of all crops
+prod_quant_bana_share_in_all_crops,Production quantity for banana as a share of all crops
+prod_quant_bean_share_in_all_crops,Production quantity for beans as a share of all crops
+prod_quant_cass_share_in_all_crops,Production quantity for cassava as a share of all crops
+prod_quant_maiz_share_in_all_crops,Production quantity for maize as a share of all crops
+prod_quant_sesa_share_in_all_crops,Production quantity for sesame as a share of all crops
+prod_quant_sorg_share_in_all_crops,Production quantity for sorghum as a share of all crops
+prod_quant_sugc_share_in_all_crops,Production quantity for sugar as a share of all crops
+prod_quant_temf_share_in_all_crops,Production quantity for temf as a share of all crops
+prod_quant_trof_share_in_all_crops,Production quantity for temf as a share of all crops
+prod_quant_vege_share_in_all_crops,Production quantity for vegetable as a share of all crops
+prodmt_reg_shr_bana,Production quantity for banana as a share of all crops
+prodmt_reg_shr_bean,Production quantity for beans as a share of all crops
+prodmt_reg_shr_cass,Production quantity for cassava as a share of all crops
+prodmt_reg_shr_maiz,Production quantity for maize as a share of all crops
+prodmt_reg_shr_sesa,Production quantity for sesame as a share of all crops
+prodmt_reg_shr_sorg,Production quantity for sorghum as a share of all crops
+prodmt_reg_shr_sugc,Production quantity for sugar as a share of all crops
+prodmt_reg_shr_temf,Production quantity for temf as a share of all crops
+prodmt_reg_shr_trof,Production quantity for temf as a share of all crops
+prodmt_reg_shr_vege,Production quantity for vegetable as a share of all crops
+spei_mean_2020_12,The average Standardized Precipitation Evapotranspiration Index (SPEI) in 2020
+carrao_expo,"Drought exposure estimates (carrao et al., 2016)"
+carrao_haza,"Drought hazard estimates (carrao et al., 2016)"
+carrao_risk,"Drought risk estimates (carrao et al., 2016)"
+carrao_vuln,"Drought vulnerability estimates (carrao et al., 2016)"
+irr_haz,Irrigation Hazard
+irr_risk,Irrigation Risk
+rain_haz,Rainfall Hazard
+rain_risk,Rainfall Risk
+vhi_area_gu_2017,% of area (with VHI below 40) (during the 2017 Gu season)
+vhi_area_gu_2018,% of area (with VHI below 40) (during the 2018 Gu season)
+vhi_area_gu_2019,% of area (with VHI below 40) (during the 2019 Gu season)
+vhi_area_gu_2020,% of area (with VHI below 40) (during the 2020 Gu season)
+vhi_area_gu_2021,% of area (with VHI below 40) (during the 2021 Gu season)
+vhi_area_gu_2022,% of area (with VHI below 40) (during the 2022 Gu season)
+vhi_ag_area_gu_2017,% of cropland area in drought (with VHI below 40) (during the 2017 Gu season)
+vhi_ag_area_gu_2018,% of cropland area in drought (with VHI below 40) (during the 2018 Gu season)
+vhi_ag_area_gu_2019,% of cropland area in drought (with VHI below 40) (during the 2019 Gu season)
+vhi_ag_area_gu_2020,% of cropland area in drought (with VHI below 40) (during the 2020 Gu season)
+vhi_ag_area_gu_2021,% of cropland area in drought (with VHI below 40) (during the 2021 Gu season)
+vhi_ag_area_gu_2022,% of cropland area in drought (with VHI below 40) (during the 2022 Gu season)
+vhi_pop_gu_2017,% of people in drought areas (with VHI below 40) (during the 2017 Gu season)
+vhi_pop_gu_2018,% of people in drought areas (with VHI below 40) (during the 2018 Gu season)
+vhi_pop_gu_2019,% of people in drought areas (with VHI below 40) (during the 2019 Gu season)
+vhi_pop_gu_2020,% of people in drought areas (with VHI below 40) (during the 2020 Gu season)
+vhi_pop_gu_2021,% of people in drought areas (with VHI below 40) (during the 2021 Gu season)
+vhi_pop_gu_2022,% of people in drought areas (with VHI below 40) (during the 2022 Gu season)
+travel_50k,Travel distance per 50km
+travel_20k,Travel distance per 20km
+travel_5k,Travel distance per 5km
+rai,Rural Accessibility Index (% of people living within 2km away from all-season roads)
+rri,Rural Reachability Index 
+grid_length,Grid Length
+pop_in_2km_grid,Population Density per 2km grid
+pop_in_5km_grid,Population Density per 5km grid
+grid_length_per_area,Grid Length per Unit area
+som_pop_area,Somalia Population per unit area
+som_pop_dens_per_poparea,Population Density per unit lived area
+share_pop_in_2km_grid,Average Share of Population within each 2km grid
+share_pop_in_5km_grid,Average Share of Population within each 5km grid
+n_health,Number of Health Facilities
+n_health_per_1k,Density of Health Facilities per square kilometer
+num_health,Number of Health Facilities
+num_health_per_1k,Density of Health Facilities per square kilometer
+n_school,Number of Schools
+n_school_per_1k,Number of Schools per square kilometer
+n_conflict_2019,Number of conflicts in 2019
+n_conflict_2020,Number of conflicts in 2020
+n_conflict_2022,Number of conflicts in 2022
+n_conflict_2018,Number of conflicts in 2018
+n_conflict_2021,Number of conflicts in 2021
+pop_5km_confl,Number of people living within 5km from conflicts (2018-2022)
+share_pop_5km_confl,Share of people living within 5km from conflicts
+n_idp,Number of IDPs
+people_2km_water,Number of people within 2km of water source
+share_pop_2km_water,Share of population within 2km of water source
+population_2022,Population in 2022
+pin_n_2022,Total number of people in need (Somalia HNO 2023)
+idp_2022,Number of IDP in 2022 (based on Somalia HNO 2023)
+idp_pin_2022,Number of IDP in need in 2022
+pin_p_2022,Share of people in need (Somalia HNO 2023)
+estimated_population_current,Estimated Current Population
+p3plus_aug_2023_sep_2023,Number of people in acute food insecurity (IPC Phase 3 or above) (August-September 2023)
+p3plus_percentage_aug_2023_sep_2023,Share of people in acute food insecurity (IPC Phase 3 or above) (August-September 2023)
 count_all,
 count_P165497,
 count_P167826,
@@ -127,11 +127,28 @@ count_P171346,
 count_P173731,
 count_P174065,
 count_P174867,
-hlt_mtr,
-hlt_wlk,
-hlt_sara_mtr,
-hlt_sara_wlk,
-scl_mtr,
-scl_wlk,
-city_mtr,
-city_wlk,
+hlt_mtr,Motorized travel time to the nearest health facility (in minutes)
+hlt_wlk,Walking travel time to the nearest health facility (in minutes)
+hlt_sara_mtr,Motorized travel time to the nearest health facility (in minutes)
+hlt_sara_wlk,Walking travel time to the nearest health facility (in minutes)
+scl_mtr,Motorized travel time to the nearest school (in minutes)
+scl_wlk,Walking travel time to the nearest school (in minutes)
+city_mtr,Motorized travel time to the nearest major city (in minutes)
+city_wlk,Walking travel time to the nearest major city (in minutes)
+SO11,Awdal Region
+SO12,Woqooyi Galbeed Region
+SO13,Togdheer Region
+SO14,Sool Region
+SO15,Sanaag Region
+SO16,Bari Region
+SO17,Nugaal Region
+SO18,Mudug Region
+SO19,Galgaduud Region
+SO20,Hiraan Region
+SO21,Middle Shabelle Region
+SO22,Banadir Region
+SO23,Lower Shabelle Region
+SO24,Bay Region
+SO25,Bakool Region
+SO26,Gedo Region
+SO28,Lower Juba Region

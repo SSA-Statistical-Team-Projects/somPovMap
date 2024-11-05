@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 
 pacman::p_load(here, ggplot2, sf, sfnetworks, kableExtra, dplyr, data.table, 
                viridis, paletteer, ggthemes, gridExtra, grid, flextable,
-               showtext, extrafont, bookdown, officer)
+               showtext, extrafont, bookdown, officer, ggExtra)
 
 sf::sf_use_s2(FALSE)
 
@@ -41,7 +41,9 @@ mean_region_cv <- round(mean(provpov_dt$CV/100, na.rm = TRUE), 3)
 ```
 ### Introduction
 
-Household surveys are often representative at the national level or at the level of the first administrative division (region/state level). National Statistical Offices and government entities can benefit from poverty estimation at a higher level of resolution, such as the district or district level. This note describes the small area estimation (SAE) methodology implemented to estimate poverty rates in Somalia at the district level. SAE is a statistical method that can be used to improve the reliability of survey estimates by combining survey data with geographically comprehensive auxiliary data, such as census when available or geospatial, remotely sensed data. In Burundi, we show that SAE generates poverty estimates that are sufficiently precise to report at the district level instead of the regional level. This has the potential to improve the targeting and evaluation of interventions intended to achieve poverty reduction in the future. Ideally, SAE combines survey data with household-level data from a recent census. Countries often aim to collect census data every 10 years. However, many African countries take more years between consecutive censuses, and indeed Somalia’s last census was conducted in 1986. Therefore, this exercise relies on contemporaneous geospatial data derived from a variety of sources. [@battese1988error] were the first to use geospatial satellite data in the context of crop production. Other studies [@georganos2019modelling], [@chi2022microestimates] have used satellite imagery to predict wealth indices, and [@van2023accurate] used satellite imagery to predict monetary poverty in Malawi. In this note, we present the approach that models poverty rates at the district level in Somalia using the model of [@fay1979estimates]. The area level model approach allows us to relate district level direct survey poverty rates to auxiliary variables (geospatial indicators) to estimate poverty rates in all districts within Somalia. [@seitz2019they] provides district level poverty rates in the Central Asia region using Fay Herriot modelling approach using auxiliary geospatial data. The World Bank has employed the SAE methodology extensively to estimate poverty and other socioeconomic indicators of interest at more granular levels and continues to produce these estimates in combination with other non-monetary measures of poverty. At this point, SAE has been applied in a wide variety of contexts across many developing countries. This note is subdivided as follows. In section 2, we present survey data (specifically the household consumption data) and why SAE is necessary for district level poverty estimation in Somalia. We also present the Fay-Herriot model as described by [@seitz2019they]. Section 3 describes the geospatial databases sourced and indicators created as well as the model selection process employed. Sections 4 and 5 describes the FH model results and the poverty maps for the country.  
+Household surveys are often representative at the national level or at the level of the first administrative division (region/state level). National Statistical Offices and government entities can benefit from poverty estimation at a higher level of resolution, such as the district or district level. This note describes the small area estimation (SAE) methodology implemented to estimate poverty rates in Somalia at the district level. SAE is a statistical method that can be used to improve the reliability of survey estimates by combining survey data with geographically comprehensive auxiliary data, such as census when available or geospatial, remotely sensed data. In Burundi, we show that SAE generates poverty estimates that are sufficiently precise to report at the district level instead of the regional level. This has the potential to improve the targeting and evaluation of interventions intended to achieve poverty reduction in the future. Ideally, SAE combines survey data with household-level data from a recent census. Countries often aim to collect census data every 10 years. However, many African countries take more years between consecutive censuses, and indeed Somalia’s last census was conducted in 1986. Therefore, this exercise relies on contemporaneous geospatial data derived from a variety of sources. [@battese1988error] were the first to use geospatial satellite data in the context of crop production. Other studies [@georganos2019modelling], [@chi2022microestimates] have used satellite imagery to predict wealth indices. However, the use of geo-referenced data is less ideal than the traditional microdata obtained from household surveys or administrative datasets. [@van2023accurate] used satellite imagery to predict monetary poverty in Malawi and noted the less than ideal nature of geospatial data. [@CORRAL2025103377] also find tat remotely sensed data may not be ideal for poverty mapping due to the relatively lower predictive power.   
+
+In this note, we present the approach that models poverty rates at the district level in Somalia using the model of [@fay1979estimates]. The area level model approach allows us to relate district level direct survey poverty rates to auxiliary variables (geospatial indicators) to estimate poverty rates in all districts within Somalia. [@seitz2019they] provides district level poverty rates in the Central Asia region using Fay Herriot modelling approach using auxiliary geospatial data. The World Bank has employed the SAE methodology extensively to estimate poverty and other socioeconomic indicators of interest at more granular levels and continues to produce these estimates in combination with other non-monetary measures of poverty. At this point, SAE has been applied in a wide variety of contexts across many developing countries. This note is subdivided as follows. In section 2, we present survey data (specifically the household consumption data) and why SAE is necessary for district level poverty estimation in Somalia. We also present the Fay-Herriot model as described by [@seitz2019they]. Section 3 describes the geospatial databases sourced and indicators created as well as the model selection process employed. Sections 4 and 5 describes the FH model results and the poverty maps for the country.  
 
 
 ### The Data
@@ -56,25 +58,27 @@ District level poverty rate estimates computed from this survey will be insuffic
 specify_decimal <- function(x, k) trimws(format(round(x, k), nsmall=k))
 
 descriptives_dt <- 
-  data.table(tot_pop_million = round(sum(spatial_dt$estimated_population_current, na.rm = TRUE)/1e6, 1),
-             pop_hhs_million = round(sum(geosurvey_dt$population_weight, na.rm = TRUE)/1e6, 1),
+  data.table(tot_pop_million = specify_decimal(sum(geosurvey_dt$population_weight, na.rm = TRUE)/1e6, 1),
+             pop_hhs_million = specify_decimal(sum(geosurvey_dt$wgt_adj2, na.rm = TRUE)/1e6, 1),
              svy_hhs = nrow(geosurvey_dt),
              povrate_ipl = 
                geosurvey_dt %>%
                summarise(povrate_ipl = weighted.mean(x = poor,
                                                      w = population_weight,
                                                      na.rm = TRUE)) %>%
-               round(4),
+               specify_decimal(3),
              recent_census = 1986 %>% as.integer(),
              region_count_sample = length(unique(geosurvey_dt$admin1Pcod[!is.na(geosurvey_dt$admin1Pcod)])),
              median_cv_region = 
                directpov_dt %>%
-               summarize(median = median(directpov_dt$CV/100, na.rm = TRUE)),
+               summarize(median = median(directpov_dt$CV/100, na.rm = TRUE)) %>%
+               specify_decimal(3),
              mean_cv_region = 
                directpov_dt %>%
                summarize(mean = weighted.mean(x = directpov_dt$CV/100, 
                                               w = directpov_dt$SampSize,
-                                              na.rm = TRUE)),
+                                              na.rm = TRUE)) %>%
+               specify_decimal(3),
              num_targets_pop = length(unique(spatial_dt$admin2Pcod[!is.na(spatial_dt$admin2Pcod)])),
              num_targets_sample = length(unique(geosurvey_dt$admin2Pcod[!is.na(geosurvey_dt$admin2Pcod)]))) %>%
   t() %>%
@@ -139,6 +143,35 @@ The EBLUP/FH estimator can be understood as a weighted average of the direct est
 
 This method is widely used by the Small Area Income and Poverty Estimates (SAIPE) program of the US census bureau and has been thoroughly validated in [@corral2023poverty]. This approach improves the error efficiency rates over the direct estimates at the target area level. Inter-area unexplained heterogeneous area effects are accounted for within the model. Section 3.3 in [@corral2022guidelines] provides a full list of pros and cons of the Fay-Herriot modelling approach. 
 
+For this small area estimation exercise, 48 of the 74 Somalia Districts are included in the SIHBS. As a result, these in-sample districts will benefit from the information available in the sample. It is sometimes the case with Fay Herriot modelling that districts with low sample sizes can result in all households from a specific sample district being all poor or not poor (${\theta}_i^{Dir}$ = 1 or 0) or only one Enumeration Area in a district is sampled. The common practice of sample variance smoothing [@you2012sampling; @yongmike2023] in the SAE literature is typically implemented to solve this problem. The variance smoothing approach of [@you2012sampling] applies a log linear model of the direct sampling variance{$\hat{V}_i$} as a function of the sampling size, $n_i$. 
+
+$$ log(\hat{V}_i) = \hat\phi{_0} + \hat\phi{_1}n_i + \varepsilon_i, \quad i = 1, ..., D $$
+Assuming $\hat\phi{_0}$ and $\hat\phi{_1}$ to be the simple OLS estimators for the regression coefficients $\phi{_0}$ and $\phi{_1}$. Applying the exponential of the equation produces the naive variance estimator [@dick1995] as follows: 
+
+$$ \hat{V}_i = e^{\hat\phi{_0} + \hat\phi{_1}n_i}$$
+[@rivbel2000] show that the naive estimator can underestimate sampling variance. They propose correction as follows: 
+
+$$ \hat{V^{RB}_i} = \hat{V_i}e^\frac{\tau^2}{2} $$
+since the naive variance estimator can be easily shown to overestimate sampling variance by a factor of $e^\frac{\tau^2}{2}$. For the purposes of our analysis, there are no districts without variances or extreme case poverty rates (${\theta}_i^{Dir}$ = 1 or 0). Consequently, we do not remove districts from the analysis. However, the National Statistical Office flagged predicted poverty rates in 3 areas as being too low. 2 of these 3 districts have low sample sizes and with only 1 and 2 primary sampling units as well. In the supplementary section, we re-estimate the Fay Herriot model without these areas and present the results. Below, we simply show the sample distribution of PSUs and households within districts and how this varies with the direct district poverty rates. 
+
+```{r figa, echo = FALSE, fig.cap = "Joint Distribution of EAs and Households (District-Level)"}
+
+p <- 
+smoothcheck_dt %>%
+  merge(spatial_dt[, c("Direct", "admin2Pcod")]) %>%
+  ggplot() + 
+  geom_point(aes(x = num_ea, y = num_hhs, color = Direct), size = 3, alpha = 0.5) + 
+  scale_color_viridis(option = "magma", direction = -1) +
+  xlab("Number of EAs in District") + 
+  ylab("Number of Households in District") + 
+  theme_minimal() + 
+  theme(legend.position = "left") 
+
+ggExtra::ggMarginal(p, type = "histogram")
+
+```
+
+
 ### The Geospatial Data and Model Selection Process
 The process leading up to model selection involves sourcing freely available geospatial indicators that might be correlated with household welfare and poverty. The geospatial features were sourced at native resolution and then zonal statistics were computed at the target area level (districts). \@ref(tab:tab5) shows all the geospatial features and the data sources employed.  
 
@@ -188,9 +221,9 @@ data.frame(
 
 We begin by transforming all indicators as necessary to minimize the risk of divergence in model parameter estimation. For indicator with values greater than 100, we take the natural logarithm. We have avoiding feature scaling to avoid excessive distortion or loss of information for the scaled variables.
 
-The geospatial data listed under the previous header was used to construct candidate features, at the grid and target area level. In addition, we include regional dummy variables. In all, we created ~157 potential geospatial candidate indicators. Using all these features in the linear mixed model risks potentially leads to overfitting the survey sample and generates poor out-of-sample estimations. 
+The geospatial data listed under the previous header was used to construct candidate features, at the grid and target area level. In addition, we include regional dummy variables. In all, we created ~157 potential geospatial candidate indicators. Using all these features in the linear mixed model risks potentially leads to over-fitting the survey sample and generates poor out-of-sample estimations. 
 
-Next, we employ a stepwise (both-ways method) selection approach which picks the most predictive set of indicators from the pool of candidate indicators. The both-ways method was used, enabling iterative testing of each variable's contribution by alternatively adding and removing variables based on statistical significance criteria at each step. This approach begins with an constant term and tests the inclusion of variables one-by-one; then it considers each for potential removal, thus optimizing the model's explanatory power while controlling for overfitting. The both-ways method provides flexibility, more so than the forward or backward algorithm, to achieve an optimal balance of predictive power and model parsimony, ensuring the only variables with significant and robust relationships to the outcome are retained. 
+Next, we employ a stepwise (both-ways method) selection approach which picks the most predictive set of indicators from the pool of candidate indicators. The both-ways method was used, enabling iterative testing of each variable's contribution by alternatively adding and removing variables based on statistical significance criteria at each step. This approach begins with an constant term and tests the inclusion of variables one-by-one; then it considers each for potential removal, thus optimizing the model's explanatory power while controlling for over-fitting. The both-ways method provides flexibility, more so than the forward or backward algorithm, to achieve an optimal balance of predictive power and model parsimony, ensuring the only variables with significant and robust relationships to the outcome are retained. 
 
 ### Fay Herriot Model Estimation Results
 The final selected model includes covariates share of the population within a 2km grid as well as the share of total production that is tropical fruit production. The regression results are as follows: 
@@ -223,10 +256,6 @@ fh_normality_fit(fhmodel_not) %>%
 
 ```
 
-The regression coefficients have the expected sign. The share of the population within the 2km grid is decreasing in poverty i.e. districts with more densely populated grids appear to be more well off (i.e. less poor). This may indicate that higher density areas attract individuals with more income or earning potential. 
-
-Several assumptions are made in this model which needed to be verified. The Fay Herriot model \( R^2 \) equals 28.5% `r as.numeric(norm_dt$rsq_conditional)*100` with an adjusted \( R^2 \) of `r as.numeric(norm_dt$rsq_marginal)*100` which is typical for the FH model particularly with only 48 in-sample districts used in the regression of only geospatial features. We assume independent normal distributions for the area effects as well as error terms. The table shows the skewness and kurtosis which should be approximately 0 and 3 for normally distributed random variables. 
-
 ```{r, echo = FALSE}
 
 
@@ -255,11 +284,18 @@ norm_dt %>%
 
 ```
 
-The normality assumptions proposed in the method section matter for the noise estimates but the empirical bayes methodology ensures that the poverty estimates are unbiased. The residual analysis suggests that the skewness and kurtosis of the idiosyncratic and district level area effects match the normality assumptions. However, there appears to be few outliers within the error term normal density plot \@ref(tab:tab3). The residual plots for both the random error and idiosyncratic errors can be found below: 
+
+The regression coefficients have the expected sign. The share of the population within the 2km grid is decreasing in poverty i.e. districts with more densely populated grids appear to be more well off (i.e. less poor). This may indicate that higher density areas attract individuals with more income or earning potential. 
+
+Several assumptions are made in this model which needed to be verified. The Fay Herriot model \( R^2 \) equals `r as.numeric(norm_dt$rsq_conditional)*100` with an adjusted \( R^2 \) of `r as.numeric(norm_dt$rsq_marginal)*100` which is typical for the FH model particularly with only 48 in-sample districts used in the regression of only geospatial features. We assume independent normal distributions for the area effects as well as error terms. The table shows the skewness and kurtosis which should be approximately 0 and 3 for normally distributed random variables. 
+
+The normality assumptions proposed in the method section matter for the noise estimates but the EB methodology ensures that the poverty estimates are unbiased. The residual analysis suggests that the skewness and kurtosis of the idiosyncratic and district level area effects match the normality assumptions. However, there appears to be few outliers within the error term normal density plot \@ref(tab:tab3). The residual plots for both the random error and idiosyncratic errors can be found below: 
+
 
 ```{r fig1, echo = FALSE, fig.cap = "Fay-Herriot Residual Plots"}
 
 ### density plots for the idiosyncratic errors and random effects
+
 
 plot_random <- 
   fhmodel_not$model$random_effects[,1] %>%
@@ -267,6 +303,7 @@ plot_random <-
   setnames(new = "values") %>%
   ggplot() + 
   geom_density(aes(x = values), fill = "blue", alpha = 0.5) + 
+  xlim(-0.3, 0.3) + 
   labs(x = "Random Effects", y = "Density", title = "Random Effect Residuals (\u03BC)") + 
   theme_minimal()
 
@@ -276,12 +313,64 @@ plot_error <-
   setnames(new = "values") %>%
   ggplot() + 
   geom_density(aes(x = values), fill = "blue", alpha = 0.5) + 
-  labs(x = "Error Terms", y = "Density", title = "Model Error Residuals (\u03B5)") + 
+  xlim(-2.5, 2.75) + 
+  labs(x = "Error Terms", y = "Density", title = "Standardized Error Residuals (\u03B5)") + 
   theme_minimal()
 
 grid.arrange(grobs = list(plot_random, plot_error), nrow = 1)
 
+xx <- shapiro.test(fhmodel_not$model$std_real_residuals)
+
+yy <- shapiro.test(fhmodel_not$model$random_effects)
+
 ```
+
+We employ the Shapiro-Wilks measure to test the null hypothesis that random variables, $e_i$ and $\mu_i$, come from a normality distributed populations. The test results, $W_{e_i} =$ `r specify_decimal(xx$statistic[[1]], 3)` ($p =$ `r specify_decimal(xx$p.value[[1]], 3)`); 
+$W_{\mu_i} =$ `r specify_decimal(yy$statistic[[1]], 3)` ($p =$ `r specify_decimal(yy$p.value[[1]], 3)`) suggest normally distributed random effects and idiosyncratic error terms. We cannot reject the null hypothesis at the 5% level (although the standardized error residuals are significant at 10%).  
+
+The Fay Herriot model employs direct estimates in predicting poverty rates. The shrinkage factor measures the ratio of the random effect to the total variance within the model. Full shrinkage $\hat\gamma_i$ = 1 means predicted poverty rates are simply the direct estimates while the other extreme uses a purely synthetic predictions, $\hat\gamma_i$ = 0. We present a scatter plot of the $\hat\gamma_i$ as a function of sample size. 
+
+```{r fig1b, echo = FALSE, fig.cap = "Scatter Plot of Shrinkage Factor vs Sample Size"}
+
+cv_dt %>%
+  merge(fhmodel_not$model$gamma) %>%
+  ggplot() + 
+  geom_point(aes(x = survey_size, y = Gamma)) + 
+  labs(
+    y = expression(paste("shrinkage factor, (",hat(gamma)[i], ")")),
+    x = "Sample Size"
+  ) + 
+  theme_bw()
+
+```
+
+In a final check, we attempt to validate the model by perform the Remove-One Model validation. Since our sample only contains 48 target areas, the typical n-fold validation process would have to split an already limited sample into 2 smaller training and test sets. Instead, the Remove-One validation process, trains a Fay Herriot model on 47 districts and removes 1 until every district has been excluded once. We compare show a plot comparing model validation estimates with the actual FH model predictions to check the stability of the model. 
+
+```{r fig1c, echo = FALSE, fig.cap = "Remove-One Model Valiadation Plot"}
+
+# Fit the linear model
+lm_model <- lm(FH_validation ~ FH, data = result_dt)
+correlation <- summary(lm_model)$r.squared ^ 0.5
+
+# Create the plot
+ggplot(result_dt, aes(x = FH, y = FH_validation)) +
+  geom_point(color = 'blue') +                             # Scatter plot
+  geom_abline(slope = 1, intercept = 0,                    # 45-degree line
+              color = 'red', linetype = "dashed") +
+  theme_minimal() +                                        # Minimal theme for a cleaner look
+  labs(title = "Remove-one Model Validation",
+       x = "Remove-one validation estimates",
+       y = "FH model estimates") +
+  xlim(c(0, 1)) +
+  ylim(c(0, 1)) +
+  # Add the R-squared as text annotation
+  annotate("text", x = 0.1, y = 0.9, 
+           label = paste0("correlation = ", round(correlation, 3)),
+           color = "black", hjust = 0)
+
+```
+
+\@ref(fig:fig1c) plots the FH model estimates against their corresponding estimates as a result of the remove-one validation model. The correlation between the set of FH model estimates and the validation estimates stands at 0.75 as shown in above chart. 
 
 ### Poverty Maps
 As a final check, the FH poverty rates at the district level are aggregated to the regional level to compare against the direct estiamtes. The regional level is the highest level of resolution at which survey design specifies national representativeness. The direct estimates in \@ref(fig:fig2) are shown as 95% confidence intervals (in red) which are plotted in comparison with Fay Herriot poverty estimates. 
@@ -302,7 +391,7 @@ provpov_dt %>%
         plot.caption = element_text(hjust = 0.5, size = 10)) 
 
 ```
-It should be noted that all the model based regional estimates appear to be lie within the direct estimates confidence intervals except in the Bakool region. 
+It should be noted that all the model based regional estimates appear to be lie within the direct estimates confidence intervals in all the regions.  
 
 The poverty map corresponding to the 2022 for Somalia at the district level in the subsequent figures: 
 
@@ -325,9 +414,11 @@ povshp_dt %>%
 
 ```
 
+
+
 Upon review of the initial estimates in collaboration with SNBS, 3 districts were identified as having unrealistically low estimates of poverty as the surrounding districts within each region had significantly higher poverty rates. These districts were Garbahaarey, Lassqoray and Zeylac in Gedo, Sanaag and Awdal regions respectively. Three benchmarking approaches were implemented in attempts to solve the problem:  
 
-i) First, the raking benchmarking method iteratively adjusts district estimates until convergence is reached with the regional poverty rate. However, the FH model regional poverty rates are all within [X-X] percent of the direct estimates, as a result this had little effect in changing the district poverty rates. 
+i) First, the raking benchmarking method iteratively adjusts district estimates until convergence is reached with the regional poverty rate. However, the FH model regional poverty rates are all within 5% percent of the direct estimates, as a result this had little effect in changing the district poverty rates. 
 
 ii) Next, the ratio method adjusts the district estimates using a constant factor 
 
@@ -380,6 +471,29 @@ provpov_dt %>%
   theme_box()
 
 ```
+
+```{r, echo = FALSE}
+
+#### include poverty map in table format
+result_dt %>%
+  merge(provpov_dt[, c("admin1Name", "admin1Pcod"), with = FALSE],
+        by = "admin1Pcod") %>%
+  dplyr::select(admin1Name, admin2Name, Direct, FH) %>%
+  mutate(Direct = specify_decimal(Direct, 3)) %>%
+  mutate(FH = specify_decimal(FH, 3)) %>%
+  as.data.table() %>%
+  setnames(old = c("admin1Name", "admin2Name", "Direct", "FH"),
+           new = c("Region", "District", "Direct Estimate", "FH Model Estimate")) %>%
+  flextable() %>%
+  set_table_properties(width = 0.5, layout = "autofit") %>%
+  fontsize(size = 10) %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  autofit() 
+
+
+```
+
+
 
 ### References
 

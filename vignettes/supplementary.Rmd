@@ -1,0 +1,322 @@
+---
+title: "Small Area Estimation of Poverty in Somalia : A Fay Herriot Model Approach"
+author: "Ifeanyi Edochie"
+date: "2024-06-20"
+output: 
+  bookdown::word_document2:
+    reference_docx: report_style.docx
+fontsize: 10pt
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+
+devtools::load_all()
+# BiocManager::install("kable", update = FALSE, validate = FALSE)
+
+pacman::p_load(here, ggplot2, sf, sfnetworks, kableExtra, dplyr, data.table, 
+               viridis, paletteer, ggthemes, gridExtra, grid, flextable,
+               showtext, extrafont, bookdown, officer, ggExtra)
+
+```
+
+Supplementary Section: Re-estimating FH Model without Garbahaarey, Lassqoray and Zeylac in SIHBS sample
+
+The National Statistical Office in Somalia flagged the aforementioned areas as possessing abnormally low poverty rates. Upon further inspection, Garbahaarey and Zeylac have only 2 enumeration areas. Table S\@ref(suptab:subtab1) presents the fewest 10 districts in number of EAs sampled. 
+
+```{r, echo = FALSE}
+
+smoothcheck_dt <- read.csv("data-clean/ebp_results/smoothcheck.csv")
+smoothcheck_dt <- smoothcheck_dt[,-1]
+
+### compute the areas with the highest 
+
+smoothcheck_dt[order(smoothcheck_dt$num_ea),] %>%
+  dplyr::arrange(num_ea) %>%    # Order by num_ea
+  head(n = 10) %>%
+  flextable() %>%
+  set_header_labels(admin2Pcod = "District Code",
+                    admin2Name = "District Name",
+                    num_hhs = "Number\nof Households",
+                    num_ea = "Number\nof EAs") %>%
+  bg(i = ~ admin2Name %in% c("Garbahaarey", "Lassqoray", "Zeylac"), bg = "#FFDDC1", part = "body") %>%
+  add_footer_lines("The colored districts were flagged by the NSO") %>%
+  align(align = "center", part = "header") %>%
+  set_table_properties(width = 0.5, layout = "autofit") %>%
+  fontsize(size = 10) %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  autofit() %>%
+  theme_box() %>%
+  set_caption(caption = "Sparsely Sampled Districts",
+              style = "Table Caption",
+              autonum = run_autonum(seq_id = "suptab", 
+                                    bkm = "suptab1")) 
+
+
+
+```
+
+Finally, we remove the 3 districts flagged by the SNBS and re-iterate the entire modelling exercise previously described including both the model/variable selection process and the FH model estimation. The results are as follows:
+
+```{r, echo = FALSE}
+
+fh_model_notrans <- readRDS("data-clean/ebp_results/fh_model_notrans_raw_sup.RDS")
+
+reg_table <- 
+fh_reportcoef_table(fh_model_notrans) %>%
+    setnames(new = c("Variables", "Coefficients", "Standard Error")) %>%
+    mutate(Variables = case_when(
+    Variables == "(Intercept)" ~ "Intercept",
+    Variables == "prodmt_reg_shr_trof" ~ "Production share in Tropical Fruit Production",
+    Variables == "share_pop_in_2km_grid" ~ "Average share of population within 2km grids",
+    TRUE ~ Variables
+  )) %>%
+  flextable() %>%
+  set_table_properties(width = 0.5, layout = "autofit") %>%
+  fontsize(size = 10) %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  autofit() %>%
+  set_caption(caption = "EBP Model (Regression Results)",
+              style = "Table Caption",
+              autonum = run_autonum(seq_id = "tab", bkm = "tab2")) %>%
+  theme_box()
+
+# # Create individual summary tables as flextables
+# rsq_table <- data.table(indicator = "Model R\u00B2", 
+#                         Marginal = specify_decimal(fh_normality_fit(fh_model_notrans)[1,2], 3),
+#                         Conditional = specify_decimal(fh_normality_fit(fh_model_notrans)[2,2], 3)) %>%
+#   flextable() %>%
+#   set_header_labels(indicator = "", Marginal = "Marginal R²", Conditional = "Conditional R²") %>%
+#   autofit() %>%
+#   theme_box()
+# 
+# eps_table <- data.table(indicator = "(Error Term) \u03B5", 
+#                         Skewness = specify_decimal(fh_normality_fit(fh_model_notrans)[3,2], 3),
+#                         Kurtosis = specify_decimal(fh_normality_fit(fh_model_notrans)[4,2], 3)) %>%
+#   flextable() %>%
+#   set_header_labels(indicator = "", Skewness = "Skewness", Kurtosis = "Kurtosis") %>%
+#   autofit() %>%
+#   theme_box()
+# 
+# rdm_table <- data.table(indicator = "(Random Effect) \u03BC", 
+#                         Skewness = specify_decimal(fh_normality_fit(fh_model_notrans)[5,2], 3),
+#                         Kurtosis = specify_decimal(fh_normality_fit(fh_model_notrans)[6,2], 3)) %>%
+#   flextable() %>%
+#   set_header_labels(indicator = "", Skewness = "Skewness", Kurtosis = "Kurtosis") %>%
+#   autofit() %>%
+#   theme_box()
+
+
+#### present the tables
+reg_table
+
+
+```
+
+
+```{r, echo = FALSE}
+
+norm_dt <- 
+fh_normality_fit(fh_model_notrans) %>%
+  mutate(value = specify_decimal(value, 3)) %>%
+  t() %>%
+  as.data.frame() 
+
+colnames(norm_dt) <- norm_dt[1,]
+norm_dt <- norm_dt[-1,]
+
+norm_dt %>%
+  as.data.frame() %>%
+  flextable() %>%
+  set_header_labels(rsq_marginal = "marginal",
+                    rsq_conditional = "conditional",
+                    epsilon_skewness = "skewness",
+                    epsilon_kurtosis = "kurtosis",
+                    random_skewness = "skewness",
+                    random_kurtosis = "kurtosis") %>%
+  add_header_row(values = c("Model R\u00B2", "(Error Term) \u03B5", "(Random Effect) \u03BC"), 
+                 colwidths = c(2, 2, 2)) %>%
+  set_table_properties(width = 0.5, layout = "autofit") %>%
+  fontsize(size = 10) %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  theme_box() %>%
+  autofit() %>%
+  set_caption(caption = "Assessing Normality Assumptions",
+              style = "Table Caption",
+              autonum = run_autonum(seq_id = "tab", bkm = "tab3"))
+
+```
+
+```{r, echo = FALSE, include = FALSE, warnings = FALSE, message=FALSE}
+
+source(here("analysis/02_fayharriotmodel-supplementary.R"))
+
+```
+
+
+
+```{r figs1, echo=FALSE, fig.show='hold', fig.cap="Poverty Maps (Population Poor & Rate)"}
+
+povshp_dt %>%
+  ggplot() +
+  geom_sf(aes(fill = FH)) +
+  scale_fill_viridis(option = "H") +
+  theme_bw() +
+  labs(fill = "Poverty Rate")
+
+# ggsave("figures/poverty_map_fhmodelnot_sup.png")
+
+povshp_dt %>%
+  ggplot() +
+  geom_sf(aes(fill = FH * estimated_population_current)) +
+  scale_fill_viridis(option = "H") +
+  theme_bw() +
+  labs(fill = "Population \nof Poor")
+
+# ggsave("figures/poverty_map_count_fhmodelnot_sup.png")
+
+```
+
+
+```{r fig4, echo = FALSE, fig.cap = "Correlation between FH Model Estimates and Direct Estimates at District Level"}
+
+result_dt[!is.na(Direct),] %>%
+  ggplot() +
+  geom_point(aes(x = Direct,
+                 y = FH)) +
+  geom_abline(intercept = 0,
+              slope = 1,
+              color = "red") +
+  ylab("FH Model Estimates") +
+  xlab("Direct Estimates") +
+  theme_bw()
+
+```
+
+
+```{r, echo = FALSE}
+
+provpov_dt %>%
+  dplyr::select(admin1Name, Direct, DirectLB, DirectUB) %>%
+  mutate(Direct = specify_decimal(Direct, 3)) %>%
+  mutate(DirectLB = specify_decimal(DirectLB, 3)) %>%
+  mutate(DirectUB = specify_decimal(DirectUB, 3)) %>%
+  flextable() %>%
+  colformat_num(j = c("Direct", "DirectLB", "DirectUB"), digits = 3) %>%
+  set_header_labels(admin1Name = "Province",
+                    Direct = "Direct Estimate",
+                    DirectLB = "Lower Bound",
+                    DirectUB = "Upper Bound") %>%
+  add_header_row(
+    values = c("", "Survey", "FH Estimate 95% Confidence Intervals"),
+    colwidths = c(1, 1, 2)
+  ) %>%
+  autofit() %>%
+  merge_h(part = "header") %>%
+  align(align = "center", part = "header") %>%
+  bg(i = ~Direct < DirectLB | Direct > DirectUB, bg = "red") %>%
+  set_table_properties(width = 0.5, layout = "autofit") %>%
+  fontsize(size = 10) %>%
+  theme_box() %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  theme_box() %>%
+  set_caption(caption = "Comparing FH Estimates to Direct Estimates at Regional Level",
+              style = "Table Caption",
+              autonum = run_autonum(seq_id = "tab", bkm = "tab6"))
+
+```
+
+
+```{r, echo = FALSE}
+
+original_dt <- read.csv("data-clean/ebp_results/povertymap_som.csv")
+
+original_dt <- original_dt %>%
+  rename(previousFH = FH)
+
+#### include poverty map in table format
+result_dt %>%
+  merge(provpov_dt[, c("admin1Name", "admin1Pcod"), with = FALSE],
+        by = "admin1Pcod", all.x = TRUE) %>%
+  merge(original_dt[, c("targetarea_codes", "previousFH")], 
+        all.x = TRUE, by.x = "Domain", by.y = "targetarea_codes") %>%
+  dplyr::select(admin1Name, admin2Name, Direct, FH, previousFH) %>%
+  mutate(Direct = specify_decimal(Direct, 3)) %>%
+  mutate(FH = specify_decimal(FH, 3)) %>%
+  as.data.table() %>%
+  setnames(old = c("admin1Name", "admin2Name", "FH", "previousFH"),
+           new = c("Region", "District", "FH Model Estimate", 
+                   "Original FH Model Estimate")) %>%
+  flextable() %>%
+  bg(i = ~ District %in% c("Garbahaarey", "Laasqoray", "Zeylac"), bg = "#FFDDC1", part = "body") %>%
+  set_table_properties(width = 0.5, layout = "autofit") %>%
+  fontsize(size = 10) %>%
+  theme_box() %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  autofit() %>%
+  set_caption(caption = "District-Level Poverty Map Table",
+              style = "Table Caption",
+              autonum = run_autonum(seq_id = "tab", bkm = "tab7"))
+
+
+
+```
+
+
+
+```{r, echo = FALSE}
+
+provpov_dt %>%
+  ggplot(aes(x = admin1Name)) +
+  geom_point(aes(y = provFH), color = "blue", size = 2) +  # Plotting provFH
+  geom_errorbar(aes(ymin = DirectLB, ymax = DirectUB), width = 0.2, color = "red") +  # Error bars for DirectLB and DirectUB
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +  # Adding a horizontal line at y = 0
+  labs(x = "Province", 
+       y = "Poverty Rate",
+       caption = "Note: Author calculations of Direct Estimate 95% CI at the \nprovince level (Red error bars) compared with FH
+       estimates at same level (blue dots)") +  # Labeling axes
+  theme_bw() +  # Setting a white background theme
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),  # Angling x-axis text
+        plot.caption = element_text(hjust = 0.5, size = 10)) 
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

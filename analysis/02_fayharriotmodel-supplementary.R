@@ -4,7 +4,7 @@
 devtools::load_all()
 
 pacman::p_load("dplyr", "data.table", "povmap", "sf", "ggplot2", "viridis",
-               "gridExtra", "hdm", "car", "MASS", "survey")
+               "gridExtra", "hdm", "car", "MASS")
 
 #### read in the data
 spatial_dt <- readRDS("data-raw/data-full.rds")
@@ -14,6 +14,12 @@ geosurvey_dt <- haven::read_dta("data-raw/SIHBS_SAE (1).dta")
 geosurvey_dt <- geosurvey_dt[, c("hhsize", "wgt_adj2", "pcer", "poor_ub",
                                  "ubpl", "latitude", "longitude", "admin2Pcod",
                                  "hhid", "ea_code_n")]
+
+#### we need to remove the 3 areas the NSO flag as missing spatial_dt and the
+#### survey
+geosurvey_dt <- geosurvey_dt[!geosurvey_dt$admin2Pcod %in%
+                               c("SO1104", "SO1503", "SO2601"),]
+
 geosurvey_dt$population_weight <- geosurvey_dt$wgt_adj2 * geosurvey_dt$hhsize
 
 
@@ -128,21 +134,6 @@ saepop_dt <-
               data = geosurvey_dt) %>%
   mutate(var = SD ^ 2)
 
-#### compute the variances taking into account the sampling design
-svydt_obj <- svydesign(ids = ~ea_code_n,
-                       strata = ~admin1Pcod,
-                       weights = ~population_weight,
-                       data = geosurvey_dt,
-                       nest = TRUE)
-
-direct_obj <- svyby(formula = ~poor,
-                    by = ~targetarea_codes,
-                    design = svydt_obj,
-                    FUN = svymean,
-                    keep.var = TRUE)
-
-direct_obj$var2 <- direct_obj$se^2
-
 setnames(saepop_dt, "Domain", "targetarea_codes")
 
 spatial_dt <- as.data.table(spatial_dt)
@@ -205,7 +196,7 @@ test_vars <- test_vars[!(test_vars %in% "rai")]
 
 #### run the stepwise model
 step_model <- stepAIC_wrapper(dt = spatial_dt[is.na(Direct) == FALSE,],
-                              xvars = test_vars[c(1:24)],
+                              xvars = test_vars[c(1:20, 22)],
                               y = "Direct")
 
 selvars_list <- names(step_model$coefficients)[!names(step_model$coefficients) %in%
@@ -230,8 +221,6 @@ smoothcheck_dt <-
   group_by(admin2Pcod, admin2Name) %>%
   summarize(num_hhs = length(hhsize),
             num_ea = length(unique(ea_code_n)))
-
-write.csv(smoothcheck_dt, "data-clean/ebp_results/smoothcheck.csv")
 
 ### replace variance in areas with extreme poverty rate (1 or 0) or
 #### single EA district
@@ -349,7 +338,7 @@ fhmodel_not <-
 #              backtransformation = "bc",
 #              eff_smpsize = "SampSize")
 
-saveRDS(fhmodel_not, "data-clean/ebp_results/fh_model_notrans_raw.RDS")
+saveRDS(fhmodel_not, "data-clean/ebp_results/fh_model_notrans_raw_sup.RDS")
 
 result_dt <- as.data.table(fhmodel_not$ind)
 
@@ -383,13 +372,13 @@ result_dt <-
         by.y = "targetarea_codes",
         all.x = TRUE)
 
-write.csv(result_dt, "data-clean/ebp_results/fh_model_not_admin2.csv")
+write.csv(result_dt, "data-clean/ebp_results/fh_model_not_admin2_sup.csv")
 
 
 ### some post estimation statistics
 coeftable_dt <- fh_reportcoef_table(model = fhmodel_not)
 
-write.csv(coeftable_dt, "data-clean/ebp_results/fh_model_not_coeftable_admin2.csv")
+write.csv(coeftable_dt, "data-clean/ebp_results/fh_model_not_coeftable_admin2_sup.csv")
 
 
 ### comparing Direct vs Small Area Estimates
@@ -447,7 +436,7 @@ provpov_dt %>%
 
 
 write.csv(provpov_dt[, c("admin1Name","Direct", "DirectLB", "DirectUB")] %>% st_drop_geometry(),
-          "data-clean/ebp_results/fhmodel_not_directprovpovrates.csv")
+          "data-clean/ebp_results/fhmodel_not_directprovpovrates_sup.csv")
 
 
 
@@ -472,7 +461,7 @@ povshp_dt %>%
   theme_bw() +
   labs(fill = "Poverty Rate")
 
-ggsave("figures/poverty_map_fhmodelnot.png")
+ggsave("figures/poverty_map_fhmodelnot_sup.png")
 
 povshp_dt %>%
   ggplot() +
@@ -481,7 +470,7 @@ povshp_dt %>%
   theme_bw() +
   labs(fill = "Population \nof Poor")
 
-ggsave("figures/poverty_map_count_fhmodelnot.png")
+ggsave("figures/poverty_map_count_fhmodelnot_sup.png")
 
 povshp_dt <-
   povshp_dt %>%
@@ -489,7 +478,7 @@ povshp_dt <-
 
 #### save an excel file for Alastair
 write.csv(povshp_dt %>% st_drop_geometry(),
-          "data-clean/ebp_results/povertymap_som.csv")
+          "data-clean/ebp_results/povertymap_som_sup.csv")
 
 
 
@@ -590,7 +579,7 @@ plot_fhmse <-
   theme_bw() +
   labs(fill = "Benchmark Poverty Rate \n (MSE Adjustment)")
 
-pdf("figures/poverty_map_fhmodelnot_withbenchmarking.pdf", width = 10, height = 12)
+pdf("figures/poverty_map_fhmodelnot_withbenchmarking_sup.pdf", width = 10, height = 12)
 
 grid.arrange(grobs = list(plot_fh, plot_fhratio, plot_fhrake, plot_fhmse),
              nrow = 2)
@@ -598,7 +587,7 @@ grid.arrange(grobs = list(plot_fh, plot_fhratio, plot_fhrake, plot_fhmse),
 
 dev.off()
 
-write.csv(result_dt, "data-clean/ebp_results/povmap_benchmark.csv")
+write.csv(result_dt, "data-clean/ebp_results/povmap_benchmark_sup.csv")
 
 ###### compare the MSEs from the in-sample areas and then compare
 
@@ -622,7 +611,6 @@ cv_dt <- merge(cv_dt, samplestat_dt, by.x = "Domain", by.y = "targetarea_codes")
 
 write.csv(cv_dt, "data-clean/ebp_results/district_cv.csv")
 saveRDS(cv_dt, "data-clean/ebp_results/district_cv.RDS")
-
 
 cv_dt %>%
   ggplot() +
@@ -673,7 +661,7 @@ result_dt <- merge(result_dt,
                    validation_dt,
                    all.x = TRUE)
 
-write.csv(validation_dt, "data-clean/ebp_results/model_validation_results.csv")
+write.csv(validation_dt, "data-clean/ebp_results/model_validation_results_sup.csv")
 
 
 
